@@ -1,16 +1,40 @@
+---
+title: "Assignment_2_Q1"
+author: "Mona Behrouzian, Maya Ansu, Traye Lin"
+date: "10/20/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#code from TA to make sure my commented code does not fall off the PDF page
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=80), tidy=TRUE)
+```
+
+
+```{r}
+setwd("C:\\Users\\monab\\Documents\\R\\BMEG310-Assignment-2\\General")
+
+```
+
+
+```{r}
+
+# read the data file:
+ovarian.dataset <- read.delim("ovarian.data", sep=",", header = FALSE)
+features <- c("perimeter", "area", "smoothness", "symmetry", "concavity", paste("protein", seq(1, 25), sep=""))
+names(ovarian.dataset) <- c("cell_id", "diagnosis", features) # paste0(features,"_mean"), paste0(features,"_se"), paste0(features,"_worst"))
+
+```
+
+
 # 1.1
-```{r}
-vec <- c(1,2,3)
-vec
-```
-
-```{r}
-#hey
-
-z <- 100
-
-```
-
 
 # 1.2
 
