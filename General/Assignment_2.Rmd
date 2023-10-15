@@ -83,6 +83,8 @@ ggbiplot(ovarian.pca, choices = c(1,2), groups = ovarian.dataset$diagnosis)
 
 ## Q1.4. Can you plot the "area" and "concavity" features associated with the cells?
 ```{r}
+#ASK TA : confirm it is okay that we used ggplot? does it look okay?
+
 library(ggplot2)
 Diagnosis <- ovarian.dataset$diagnosis
 ggplot(ovarian.dataset)+
@@ -94,9 +96,16 @@ ggplot(ovarian.dataset)+
 ```{r}
 # the first plot gives better separation.
 
+# LATERRRRRRRRRRRRRRRRR
+
 ```
 
 ## BONUS: Q1.6 (later! i think the TA said it is just 1 line of code)
+
+```{r}
+#LATERRRRRRRRRRRR
+```
+
 
 # Q2. CLUSTERING
 *When comparing model predictions to true labels, obtain a confusion matrix and include this result in your submission. You can obtain this by using the table() function like so: table(predictions, labels)*
@@ -113,7 +122,7 @@ library(factoextra) #load library
 ovarian.features <- scale(ovarian.dataset[,c(3:32)]) 
 
 # Compute k-means with k = 2
-set.seed(123)
+#set.seed(123)
 kmeans2 <- kmeans(ovarian.features, 2, nstart = 25)
 
 #plotting results
@@ -127,7 +136,7 @@ fviz_cluster(kmeans2, data = ovarian.features)
 
 #convert the clusters into diagnosis labels 
 cluster <- kmeans2$cluster
-predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+predicted.diagnosis <- factor(ifelse(cluster == 1, "M", "B")) #code from Hint
 expected.diagnosis <- factor(ovarian.dataset$diagnosis)
 
 #Install required packages
@@ -139,52 +148,73 @@ confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
 confusion.matrix
 
 ```
-```{r}
-confusion.matrix.v2 <- table(predicted.diagnosis, expected.diagnosis)
-confusion.matrix.v2
-
-```
 
 ## Q2.2. Repeat the kmeans analysis 10 times and report the mean accuracy across the 10 runs. Why are the results different in each run?
 
 ```{r}
+### ASK TA!!! why is it giving 92% or 100-92% each time??? is that the whole point?
 
-
+ten.runs <- c(1:10)
 
 for(i in 1:10){
-  kmeans2 <- kmeans(ovarian.features, 2)
-  
-
+  kmeans2 <- kmeans(ovarian.features, 2, nstart = 25)
+  cluster <- kmeans2$cluster
+  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+  confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
+  accuracy <- confusion.matrix$overall['Accuracy']
+  ten.runs[i] <- accuracy
 }
+ten.runs*100
+
+mean(ten.runs)*100
+```
+
+## Q2.3. Repeat the same analysis but with the top 5 PCs.
+```{r}
+#option 1
+# 
+
+
+# five.runs <- c(1:5)
+# 
+# for(i in 1:5){
+#   data.kmean.pca <- kmeans(ovarian.pca$x[,i], 2, nstart = 25)
+#   cluster <- data.kmean.pca$cluster
+#   predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+#   confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
+#   accuracy <- confusion.matrix$overall['Accuracy']
+#   five.runs[i] <- accuracy
+# }
+# five.runs*100
+# 
+# mean(five.runs)*100
 
 ```
 
-
-
 ```{r}
-# #computing mean of each variable by clusters using the original data
-# 
-# aggregate()
+#option 2 
+
+ten.runs.pca <- c(1:10)
+
+for(i in 1:10){
+  data.kmean.pca <- kmeans(ovarian.pca$x[,1:5], 2, nstart = 25)
+  cluster <- data.kmean.pca$cluster
+  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+  confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
+  accuracy <- confusion.matrix$overall['Accuracy']
+  ten.runs.pca[i] <- accuracy
+}
+ten.runs.pca*100
+
+mean(ten.runs.pca)*100
+
 ```
+## Q2.4. Compare the results between Q2.2. and Q2.3.
+# The results get worse! Why? Perhaps it was overfitted 
 
 
+### Q3. CLASSIFICATION
 ```{r}
-# # before clustering, need to scale the data. only scaling the subset of data containing the features
-# ovarian.features <- ovarian.dataset[,c(3:32)]
-# 
-# #code from R documentation: 
-# cl <- kmeans(ovarian.features, 2)
-# # plot(ovarian.features, col= cl$cluster)
-# #points(cl$centers, col = 1:2, pch=8, cex=2)
-# 
-# ss <- function(ovarian.features) sum(scale(ovarian.features, scale = FALSE)^2)
-# 
-# ## cluster centers "fitted" to each obs.:
-# fitted.ov.features <- fitted(cl)
-# resid.ov.features <- ovarian.features - fitted(cl)
-# 
-# kmeans(ovarian.features,2)$withinss
-
 
 ```
 
