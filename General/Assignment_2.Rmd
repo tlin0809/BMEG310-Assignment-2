@@ -1,0 +1,190 @@
+---
+title: "Assignment_2"
+author: "Mona Behrouzian"
+date: "10/10/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#code from TA to make sure my commented code does not fall off the PDF page
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=80), tidy=TRUE)
+```
+
+
+```{r}
+setwd("C:\\Users\\monab\\Documents\\R")
+
+ovarian.dataset <- read.delim("ovarian.data", sep=",", header = FALSE)
+features <- c("perimeter", "area", "smoothness", "symmetry", "concavity", paste("protein", seq(1, 25), sep=""))
+names(ovarian.dataset) <- c("cell_id", "diagnosis", features) 
+# paste0(features,"_mean"), paste0(features,"_se"), paste0(features,"_worst"))
+
+```
+
+```{r}
+#getting a sense of the data that has been loaded
+#columns are: ID (not a feature), diagnosis plus the 5 variables & 25 proteins (ie 30 features)
+
+#head(ovarian.dataset)
+```
+
+# Q1. DIMENSIONALITY REDUCTION
+## Q1.1. Perform PCA on the features of the dataset. How much of the variation in the data is associated with PC1?
+### 42.8% of the variation in the data is associated with PC1 
+```{r}
+# PCA code from tutorial 1. columns 3 to 32 only are features
+# scales and centers the data, required for PCA
+# Outputs the features as rows, and principle components as columns, or the axes 
+ovarian.pca <- prcomp(ovarian.dataset[,c(3:32)], center = TRUE, scale. = TRUE)
+
+# Gives the Important of components
+#	Shows us the standard deviation and proportion of variance
+summary(ovarian.pca)
+```
+
+## Q1.2. You want to represent 90% of the variance in the data by dimensionality reduction. How many PCs do you need to achieve this? In other words, what would be the dimensionality of the reduced feature space so that you preserve 90% of the variability in the data?
+### Need 9 PCs for 90% of the variance
+```{r}
+# we are looking for a cumulative proportion of variance of 90%
+
+# extract the standard deviation of the PCA
+std.pca <- ovarian.pca$sdev
+
+# variance is square of std
+var.pca <- std.pca^2
+
+# proportion of var is the variance divided by sum of all variances
+prop.pca <- var.pca/sum(var.pca)
+
+# cumulative proportion is the cumulative sum of proportion of variance 
+c.sum.pca <- cumsum(prop.pca)
+
+# use "which" function to find 1st instance when the cumsum is >=90% 
+which(c.sum.pca >= 0.9)[1]
+
+```
+## Q1.3. In a 2-D plot, can you plot the observations corresponding to the first two important PCs? Note, use two different colors to represent the two classes of cells.
+
+```{r}
+#install.packages("devtools")
+library(devtools)
+#install.packages("remotes")
+remotes::install_github("vqv/ggbiplot")
+library(ggbiplot)
+library(ggplot2)
+library(plyr)
+library(scales)
+library(grid)
+
+ggbiplot(ovarian.pca, choices = c(1,2), groups = ovarian.dataset$diagnosis)
+```
+
+## Q1.4. Can you plot the "area" and "concavity" features associated with the cells?
+```{r}
+library(ggplot2)
+Diagnosis <- ovarian.dataset$diagnosis
+ggplot(ovarian.dataset)+
+  geom_point(aes(x=Area, y=Concavity, color = Diagnosis))
+
+```
+
+## Q1.5. What is the difference between the two plots? Which one gives you better separation between the classes and why?
+```{r}
+# the first plot gives better separation.
+
+```
+
+## BONUS: Q1.6 (later! i think the TA said it is just 1 line of code)
+
+# Q2. CLUSTERING
+*When comparing model predictions to true labels, obtain a confusion matrix and include this result in your submission. You can obtain this by using the table() function like so: table(predictions, labels)*
+
+## Q2.1. Apply kmeans clustering on the data and identify two clusters within your dataset. What is the concordance between the clusters that you have identified and the true labels of the cells (Benign vs Malignant).
+
+```{r}
+#using code from the webpage linked in tutorial 2 by datanovia and factoextra
+
+#install.packages("factoextra") # for beautiful graph of clusters
+library(factoextra) #load library
+
+#must scale data first
+ovarian.features <- scale(ovarian.dataset[,c(3:32)]) 
+
+# Compute k-means with k = 2
+set.seed(123)
+kmeans2 <- kmeans(ovarian.features, 2, nstart = 25)
+
+#plotting results
+fviz_cluster(kmeans2, data = ovarian.features)
+             
+
+#print(km.res) # Print the results
+```
+```{r}
+# What is the concordance between the clusters that you have identified and the true labels of the cells (Benign vs Malignant)?
+
+#convert the clusters into diagnosis labels 
+cluster <- kmeans2$cluster
+predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+expected.diagnosis <- factor(ovarian.dataset$diagnosis)
+
+#Install required packages
+#install.packages('caret')
+library(caret) #library needed to create confusion matrix
+
+#create confusion matrix
+confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
+confusion.matrix
+
+```
+```{r}
+confusion.matrix.v2 <- table(predicted.diagnosis, expected.diagnosis)
+confusion.matrix.v2
+
+```
+
+## Q2.2. Repeat the kmeans analysis 10 times and report the mean accuracy across the 10 runs. Why are the results different in each run?
+
+```{r}
+
+
+
+for(i in 1:10){
+  kmeans2 <- kmeans(ovarian.features, 2)
+  
+
+}
+
+```
+
+
+
+```{r}
+# #computing mean of each variable by clusters using the original data
+# 
+# aggregate()
+```
+
+
+```{r}
+# # before clustering, need to scale the data. only scaling the subset of data containing the features
+# ovarian.features <- ovarian.dataset[,c(3:32)]
+# 
+# #code from R documentation: 
+# cl <- kmeans(ovarian.features, 2)
+# # plot(ovarian.features, col= cl$cluster)
+# #points(cl$centers, col = 1:2, pch=8, cex=2)
+# 
+# ss <- function(ovarian.features) sum(scale(ovarian.features, scale = FALSE)^2)
+# 
+# ## cluster centers "fitted" to each obs.:
+# fitted.ov.features <- fitted(cl)
+# resid.ov.features <- ovarian.features - fitted(cl)
+# 
+# kmeans(ovarian.features,2)$withinss
+
+
+```
+
