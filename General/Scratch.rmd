@@ -1,2 +1,5 @@
 Link: version control in Rstudio 
 https://datacarpentry.org/rr-version-control/03-git-in-rstudio/index.html
+
+Link: Q3-related resources on how to manually get accuracy and precision from table()
+https://rpubs.com/tmartens/classification_metrics
