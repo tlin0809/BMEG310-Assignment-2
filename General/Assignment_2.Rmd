@@ -160,9 +160,11 @@ for(i in 1:10){
   kmeans2 <- kmeans(ovarian.features, 2, nstart = 25)
   cluster <- kmeans2$cluster
   predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+  # try mean(** == ***)
   confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
   accuracy <- confusion.matrix$overall['Accuracy']
   ten.runs[i] <- accuracy
+  ### fix 
 }
 ten.runs*100
 
@@ -170,26 +172,6 @@ mean(ten.runs)*100
 ```
 
 ## Q2.3. Repeat the same analysis but with the top 5 PCs.
-```{r}
-#option 1
-# 
-
-
-# five.runs <- c(1:5)
-# 
-# for(i in 1:5){
-#   data.kmean.pca <- kmeans(ovarian.pca$x[,i], 2, nstart = 25)
-#   cluster <- data.kmean.pca$cluster
-#   predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
-#   confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
-#   accuracy <- confusion.matrix$overall['Accuracy']
-#   five.runs[i] <- accuracy
-# }
-# five.runs*100
-# 
-# mean(five.runs)*100
-
-```
 
 ```{r}
 #option 2 
@@ -199,10 +181,12 @@ ten.runs.pca <- c(1:10)
 for(i in 1:10){
   data.kmean.pca <- kmeans(ovarian.pca$x[,1:5], 2, nstart = 25)
   cluster <- data.kmean.pca$cluster
-  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint\
+  # try the thing
   confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
   accuracy <- confusion.matrix$overall['Accuracy']
   ten.runs.pca[i] <- accuracy
+  ## fix 
 }
 ten.runs.pca*100
 
@@ -215,6 +199,50 @@ mean(ten.runs.pca)*100
 
 ### Q3. CLASSIFICATION
 ```{r}
-
+#Divide your data into training and test sets using the following command:
+ovarian.dataset.train <- ovarian.dataset[sample(nrow(ovarian.dataset))[1:(nrow(ovarian.dataset)/2)],]
+ovarian.dataset.test <- ovarian.dataset[sample(nrow(ovarian.dataset))[(nrow(ovarian.dataset)/2):(nrow(ovarian.dataset))],]
 ```
+"sample" randomly takes half of the data as training data, other half for testing 
+
+### Q3.1. Design a logistic regression classifier to identify (differentiate) benign and malignant cells. Report the performance of the classification technique on the training and test sets. You can report accuracy, precision and recall. Compare the performance of the classifier on the training and test set and provide a reason as to why one is better than the other.
+
+3.1 use logistic regression, like the tutorial 
+show the table!!! must! graded!
+based on the table, can calculate several things : a and p and r
+but dont do it manually. use code.
+
+
+
+We need to first convert all the M labels to be 1 and the Benign labels to be 0
+```{r}
+ovarian.dataset.train$diagnosis <- as.factor(ovarian.dataset.train$diagnosis)
+```
+
+
+```{r}
+glm.training <- glm(diagnosis ~. - cell_id, data = ovarian.dataset.train, family = binomial)
+summary(glm.training)
+```
+
+
+### Q3.3. Compare the results between Q3.1. and Q3.2. Do the results get better or worse? Why?
+TA says obvious which data will be better?
+
+make sure to use type=response 
+
+
+use the link for ROC 
+
+part 6: do part 1,2,3 aagain but for another classification model. other options are in tutorial, eg naive base, svm, random forest 
+
+
+
+
+
+most correct way!!!!!!: 
+split data first
+apply pca on the training data
+use the PCs from the training set to test the accuracy of the test set! 
+
 
