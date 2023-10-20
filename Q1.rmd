@@ -7,7 +7,7 @@
 # 1.4
 
 # 1.5 
-The first plot should provide a better representation of the seperation between 2 classes as it underwent PCA and dimentionality reduction 
+Traye - The first plot should provide a better representation of the separation between 2 classes as it underwent PCA and dimensionality reduction.
 
 # 1.6 (bonus)
 
