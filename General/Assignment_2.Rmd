@@ -1,7 +1,7 @@
 ---
 title: "Assignment_2"
-author: "Mona Behrouzian"
-date: "10/10/2023"
+author: "Mona Behrouzian, Traye Lin, Maya Ansu"
+date: "October 22, 2023"
 output: pdf_document
 ---
 
@@ -10,17 +10,19 @@ Set up code
 knitr::opts_chunk$set(echo = TRUE)
 
 #code from TA to make sure my commented code does not fall off the PDF page
-knitr::opts_chunk$set(tidy.opts=list(width.cutoff=80), tidy=TRUE)
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60), tidy=TRUE)
 
 setwd("C:\\Users\\monab\\Documents\\R")
 
 ovarian.dataset <- read.delim("ovarian.data", sep=",", header = FALSE)
-features <- c("perimeter", "area", "smoothness", "symmetry", "concavity", paste("protein", seq(1, 25), sep=""))
+features <- c("perimeter", "area", "smoothness", "symmetry", "concavity", 
+              paste("protein", seq(1, 25), sep=""))
 names(ovarian.dataset) <- c("cell_id", "diagnosis", features) 
 # paste0(features,"_mean"), paste0(features,"_se"), paste0(features,"_worst"))
 
 #getting a sense of the data that has been loaded
-#columns are: ID (not a feature), diagnosis plus the 5 variables & 25 proteins (ie 30 features)
+#columns are: ID (not a feature), diagnosis plus the 5 variables & 25 proteins 
+#(ie 30 features)
 
 #head(ovarian.dataset)
 ```
@@ -60,7 +62,7 @@ c.sum.pca <- cumsum(prop.pca)
 which(c.sum.pca >= 0.9)[1]
 ```
 ## Q1.3. In a 2-D plot, can you plot the observations corresponding to the first two important PCs? Note, use two different colors to represent the two classes of cells.
-*ANSWER: See plot below*
+*ANSWER: See plot below.*
 ```{r}
 #install.packages("devtools") #in console
 library(devtools)
@@ -72,11 +74,13 @@ library(plyr)
 library(scales)
 library(grid)
 
-ggbiplot(ovarian.pca, choices = c(1,2), groups = ovarian.dataset$diagnosis)
+ggbiplot(ovarian.pca, choices = c(1,2), groups = ovarian.dataset$diagnosis)+
+  ggtitle("Observations for PC1 and PC2")+
+  theme(plot.title = element_text(hjust = 0.5)) #centers the title
 ```
 
 ## Q1.4. Can you plot the "area" and "concavity" features associated with the cells?
-*ANSWER: See plot below*
+*ANSWER: See plot below.*
 ```{r}
 library(ggplot2)
 Diagnosis <- ovarian.dataset$diagnosis
@@ -84,22 +88,24 @@ Area <- ovarian.dataset$area
 Concavity <- ovarian.dataset$concavity
 
 ggplot(ovarian.dataset)+
-  geom_point(aes(x=Area, y=Concavity, color = Diagnosis))
+  geom_point(aes(x=Area, y=Concavity, color = Diagnosis))+
+  ggtitle("Area vs Concavity Features")+
+  theme(plot.title = element_text(hjust = 0.5)) #centers the title
 ```
 
 ## Q1.5. What is the difference between the two plots? Which one gives you better separation between the classes and why?
-*The clustered plot gives better separation compared to the second plot. This makes sense because the clustered plot used PCA to determine which two features define the most variance in the data set, whereas just ploting area vs concavity is simply selecting two features to plot at random.*
-*PCA determines new axes that gives the most variance in our dataset so we are better able to cluster our observations.* 
+*The clustered plot gives better separation compared to the second plot. This makes sense because the clustered plot used PCA to determine which two features define the most variance in the data set, whereas just plotting area vs concavity is simply selecting two features to plot at random.*
+*PCA determines new axes that gives the most variance in our data set so we are better able to cluster our observations.* 
 
-## BONUS: Q1.6 
-(later! i think the TA said it is just 1 line of code)
-
+## BONUS: Q1.6 Plot the distribution of the PCs
 ```{r}
-#LATERRRRRRRRRRRR
+boxplot(ovarian.pca$x)
+title("Distribution of Principle Components")
 ```
 
 
-------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------
 
 # Q2. CLUSTERING
 Note: When comparing model predictions to true labels, obtain a confusion matrix and include this result in your submission. You can obtain this by using the table() function like so: table(predictions, labels)
@@ -127,7 +133,7 @@ fviz_cluster(kmeans2, data = ovarian.features)
 ```
 
 PART 2: What is the concordance between the clusters that you have identified and the true labels of the cells (Benign vs Malignant).
-*ANSWER: accuracy, precision, and recall listed below.*
+*ANSWER: Accuracy, precision, and recall listed below! 92%, 91%, and 96%, respectively. This suggests we have a well-performing clustering model, i.e. it did a good job at separating and labelling our data.*
 ```{r}
 #First must convert the clusters into diagnosis labels 
 cluster <- kmeans2$cluster
@@ -158,8 +164,8 @@ sprintf("Recall is: %f percent", recall)
 ```
 
 ## Q2.2. Repeat the kmeans analysis 10 times and report the mean accuracy across the 10 runs. Why are the results different in each run?
-*ANSWER: The results differ each time you run kmeans, because this algorithm randomly picks initial cluster centers, and then iterates to minimize the within-cluster sum of squares error.* 
-*In other words, the mean accuracy across the 10 runs differs every time you run k-means.*
+*ANSWER: The results differ each time you run k-means, because there is a 50% chance that the model labels the B's as 0's, vice versa. To correct for this, we subtracted 100% from the accuracies that were less than 50%.*
+*This happens because k-means randomly picks initial cluster centres, and then iterates to minimize the within-cluster sum of squares error, leading to a different mean accuracy across the 10 runs every time you run k-means.*
 ```{r}
 ten.runs <- c(1:10) #initialize a variable
 
@@ -177,9 +183,14 @@ for(i in 1:10){
   fm <- confusionMatrix[2,1] #false malignant 
   
   accuracy <- (tb+tm)/(tb+fb+fm+tm)
+  
+  #if statement to account the k-means giving the reverse of B or M
+  #We do this because there is always a 50% chance the labels will 0 for B or M, vice versa.
+  if (accuracy < 0.5) {
+    accuracy <- 1-accuracy
+  }
 
   ten.runs[i] <- accuracy
-  #TA:  fix code to subtract from 100%
 }
 ten.runs*100
 
@@ -204,8 +215,14 @@ for(i in 1:10){
   fm <- confusionMatrix[2,1] #false malignant 
   
   accuracy <- (tb+tm)/(tb+fb+fm+tm)
+  
+  #if statement to account the k-means giving the reverse of B or M
+  #We do this because there is always a 50% chance the labels will 0 for B or M, vice versa.
+  if (accuracy < 0.5) {
+    accuracy <- 1-accuracy
+  }
+  
   ten.runs.pca[i] <- accuracy
-  #TA:  fix code to subtract from 100%
 }
 ten.runs.pca*100
 
@@ -213,10 +230,15 @@ sprintf("Mean Accuracy across the 10 runs (but using top 5 PCs) is: %f percent",
 ```
 
 ## Q2.4. Compare the results between Q2.2. and Q2.3.
-*ANSWER: The mean accuracy across the 10 runs was about 50% for both using k-means for clustering the original data set AND for clustering the top 5 principle components*
-*These similar results suggest that the top 5 PCs capture enough variance as compared to including all the features.*
-*In other words, the top 5 PCs do a good job at representing the variance of the whole data set.*
+*ANSWER: The mean accuracy across the 10 runs was 92.16% for using k-means alone for clustering the original data set, but it was 91.84% for clustering the top 5 principle components.*
+*This suggests to us that when using only the top 5 PCs in this case, we ended up losing some of the important information/features that help describe the variance of our observations, leading to a reducing in the performance of our model.*
 
+*To improve this clustering model, we could chose to either only use k-means (no PCA), or we could try to use PCA but with more of the PCs, e.g. we know that the top 9 PCs captures 90% of the variance, so we could try top 9 PCs instead of top 5.*
+*Conversely, the top 5 PCs only captured 80% of the variance.*
+
+
+--------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------
 
 # Q3. CLASSIFICATION
 
@@ -271,8 +293,8 @@ summary(log.reg.model)
 #but, that just means that the function was able to perfectly separate the variable into 0's and 1's.
 #this is what we wanted!
 ```
-Note that ALLLLL the p-values are so HIGH! Thus, none of the coefficients are significant here. 
-To improve the model, you would drop the features based on which ones have high/bad p value 
+Note that ALL the p-values are so HIGH! Thus, none of the coefficients are significant here. 
+To improve the model, you would drop the features based on which ones have high/bad p value.
 
 We now have the model trained, but need to get the prediction from it.
 Need to extract the probabilities from the model, using the prediction function!
@@ -286,10 +308,9 @@ probabilities[1:5]
 These probabilities are very far from 0.5, ie they are extremely close to 0 or 1, which is good! Our model is classifying strongly. 
 
 So we have the probabilities, but how to convert them to labels? 
-Consider the typical s-shape logistic reg curve. If the prob is >0.5 it is yes, <0.5 it is 0. Because it is binary. 
 We simply need to use ifelse to do this. It will convert each of the probabilities to the B or M label.
 ```{r}
-prediction <- ifelse(probabilities > 0.5, "M", "B")`
+prediction <- ifelse(probabilities > 0.5, "M", "B")
 
 expected <- ovarian.dataset.train$diagnosis
 
@@ -314,7 +335,7 @@ sprintf("Precision is: %f", prec)
 recall <- tb/(tb+fm)*100
 sprintf("Recall is: %f", recall)
 ```
-*ANSWER: Thus, the accuracy, precision, and recall of our model all seems to be 100% - which makes sense because we are testing our model with the training set we used to build the model in the first place.*
+*ANSWER: Thus, the accuracy, precision, and recall of our model all seems to be 100% - which makes sense because we are testing our model with the training set we used to build the model in the first place!*
 
 PART 2: Compare the performance of the classifier on the training and test set and provide a reason as to why one is better than the other.
 ```{r}
@@ -328,7 +349,7 @@ expected.test <- ovarian.dataset.test$diagnosis
 
 probabilities.test <- predict(log.reg.model, ovarian.dataset.test, type = "response")
 
-probabilities.test[1:5]
+#probabilities.test[1:5]
 
 prediction.test <- ifelse(probabilities.test > 0.5, "M", "B")
 
@@ -350,16 +371,10 @@ recall <- tb/(tb+fm)*100
 sprintf("(3.1) Recall is: %f", recall)
 
 ```
-*ANSWER: the accuracy, precision, and recall from running our test set through our model are very high - but not all 100% like we say before.*
-*This makes sense, because it's the first time the model is seeing this dataset, so it's expected to make some mistakes in classifying.*
+*ANSWER: The accuracy, precision, and recall from running our test set through our model are very high - but not all 100% like we saw before.*
+*This makes sense, because it's the first time the model is seeing this data set (test), so it's expected to make some mistakes in classifying.*
 
 ### Q3.2. Repeat the same task as Q3.1. with the top 5 PCs.
-
-Tutorial: most correct way!!!!!!: 
-split data first
-apply pca on the training data
-use the PCs from the training set to test the accuracy of the test set! 
-
 ```{r}
 #Apply PCA on raw training set
 train.pca <- prcomp(ovarian.dataset.train[,c(3:32)], center = TRUE, scale. = TRUE)
@@ -399,26 +414,36 @@ sprintf("Precision using PCA is: %f", prec)
 
 recall <- tb/(tb+fm)*100
 sprintf("Recall using PCA is: %f", recall)
-
 ```
 
 
 ### Q3.3. Compare the results between Q3.1. and Q3.2. Do the results get better or worse? Why?
-*ANSWER: The results got BETTER when using PCA. This makes sense, because PCA allowed us to pick the features which describe the most variance in the set, thus making our classifier's performance better.*
+*ANSWER: Without PCA we got 97.1% accuracy, but with using top 5 PCs, we got 97.7% accuracy.*
+*The accuracy got marginally better when using the top 5 PCs, i.e. the accuracy increased. This makes sense, because PCA allowed us to pick the features which describe the most variance in the data set, thus making our classifier's performance better.*
+*Note that the accuracy only got marginally better. This could suggest that a lot of the features in the original set were already important to consider for variance.*
+*Note that the training set and test set were randomly picked/divided - this may affect how well our model performed with and without PCA. Regardless, the difference in accuracy was marginal.*
 
 ### Q3.4. Compare the results of the clustering (Q2) and classification (Q3) methods. Which one gives you better result?
-TA: you should compare non-pca with non-pca and pca with pca. 
-*ANSWER: For both clustering and classification, we got a higher accuracy when using PCA*
-*For clustering, without PCA we got roughly 50% accuracy, but with PCA, we got similar but typically higher accuracy, roughly 60%.*
-*For classification, without PCA we got 97% accuracy, but with PCA, we got 98%.*
-*Overall, PCA led us to have similar accuracies, but always HIGHER accuracies.*
+*ANSWER:* 
+*For clustering, without PCA we got 92.16% accuracy, but with using top 5 PCs, we got 91.84% accuracy.*
+*For classification, without PCA we got 97.1% accuracy, but with using top 5 PCs, we got 97.7% accuracy.*
 
-*This makes sense as PCA allows us to extract the features that describe the most amount of variance in our dataset.*
-*Thus, we can expect to have more accurate models when using PCA.*
+**CLUSTERING vs CLASSIFICATION (not using PCA)**
+*In terms of comparing clustering and classification methods, classification showed much higher accuracy (regardless of using PCs).*
+*This makes sense, because classification is a form of supervised learning, meaning we tell the model what the patterns/labels should be. Whereas clustering is  unsupervised learning, meaning we have observations without any labels but the model needs to determine the labels based on the features.*
 
-*talk about the centroid and stuff*
+*For clustering, we used k-means to minimize the within-cluster sum of squares error, and iterate multiple times. We recalculate the cluster centres again and again. It involves starting with a random assignment, so each time you run k-means you get a different clustering and accuracy.*
+*Clustering performs well if the intra-class similarity is high and the inter-class similarity is low. This helps explain why our results were not very accurate. Our cluster plot in Q2.1 showed that the 2 clusters were right beside each other, meaning that the inter-class similarity is high, which is not ideal. Additionally, the intra-class similarity is low, meaning the observations withing the clusters are quite spread out, which is again not ideal.*
 
-compare accuracy (kmeans and log.reg.model.test) vs accuracy (kmean&pca and log.reg.model&pca)
+*For logistic regression, we want to fit the data with a sigmoidal curve and then outputs an approximation of the probability of each point being a 0 or 1. It forces us to fit our data to the sigmoidal curve.*
+
+**USING PCA FOR CLUSTERING vs USING PCA FOR CLASSIFIATION**
+*In terms of comparing how each model did when using the top 5 PCs, we saw that the accuracy for the clustering model slightly decreased, whereas the accuracy for the classification model slightly increased. Note that this is not always true; it can depend on our data set (i.e. how the algorithm split the data into training and test) and our application.*
+
+*The decrease of accuracy for clustering using the top 5 PCs could be due to the fact that the top 5 PCs only captured 80% of the variance in our data set. More PCs would be needed to improve the accuracy of this model, for example we know that the top 9 PCs capture 90% of the variance, and the top 14 PCs give 95% of the variance, etc. K-means performs better when there is more variance in the data set, so excluding features (i.e. only using the top 5 PCs) reduced the performance/accuracy.*
+*Note that we randomly split the data set into training and test for classification, which may contribute to the differences in accuracy as well.*
+*The increase of accuracy for classification using the top 5 PCs is due to the fact that PCA allowed us to pick the features which describe the most variance in the data set, thus making our classifier's performance better.*
+
 
 ### Q3.5. Install the library "ROCR" and load it. Then, run the following lines using your trained logistic regression model:
 ```{r}
@@ -428,25 +453,111 @@ pred.prob <- predict(log.reg.model, ovarian.dataset, type="response")
 predict <- prediction(pred.prob, ovarian.dataset$diagnosis, label.ordering=c("B","M"))
 perform <- performance(predict,"tpr","fpr")
 plot(perform,colorize=TRUE)
+title("ROC Curve of Logistic Regression Model")
 ```
 This will generate an ROC curve of the performance of the classifier for a range of thresholds. Take a look at https://towardsdatascience.com/understanding-auc-roc-curve-68b2303cc9c5 for a summary of ROC curves.
 
-3.5.1. Given our ROC curve, what would you say it tells us about the overlap of the two classes? 
-*ANSWER: based on the shape, there is very little overlap*
+Given our ROC curve, what would you say it tells us about the overlap of the two classes? What can we say about the model's separability? How does an ROC curve tell us more about the model's performance than a single sensitivity/specificity measure?
 
-3.5.2. What can we say about the model's separability? 
-*ANSWER: high separability.*
+*ANSWER:*
+*Based on the shape of the ROC curve, there is very little overlap, suggesting that the model has high separability.*
+*This is because the AUC (area under ROC curve) is approximately 1 as seen from the plot, which indicates that the curves for the positive class (Malignant cell in our case) and negative class (Benign cell) don't overlap very much. This means that the model can strongly distinguish between B and M cells.*
 
-3.5.3. How does an ROC curve tell us more about the model's performance than a single sensitivity/specificity measure?
-*ANSWER: sometimes accuracy alone isngt giving us the info we are looking for. ROC gives robustness *
-*depending on our application, roc tells us what threshold to use *
-*useful for imbalanced problem!!! *
+*Comparing just accuracy is not always sufficient, but an ROC curve can tell us much more about our model; it can tell us how robust our model is for different applications. This is essentially a performance plot over a range of different thresholds. The ROC also gives us sensitivity, which is another performance metric other than accuracy/precision/recall. Note that a single sensitivity measure is just one point on the ROC curve, but the ROC curve gives all the measures across possible thresholds for our model.*
 
+*In other words, ROC curves help us determine what threshold to select based on our application, i.e. what threshold to pick if we want to have a very low false positive rate, or a very low true positive rate. This is especially helpful for imbalanced problems, which we are dealing with here.*
 
-### Q3.6 . Design another classifier (using a different classification method) and repeat Q3.1-3.
+### Q3.6. Design another classifier (using a different classification method) and repeat Q3.1-3.
+```{r}
+# 3.6.1 Designing a new classifier
 
-part 6: do part 1,2,3 again but for another classification model. other options are in tutorial, eg naive base, svm, random forest 
+#install.packages("rpart") #in console
+#install.packages("rpart.plot")
+library(rpart)
+library(rpart.plot)
+
+# classification method 
+  # decision tree
+  # type = 'class' for binary model
+tree.model <- rpart(diagnosis~., data = ovarian.dataset.train, method = 'class')
+rpart.plot(tree.model, extra = 106)
+# extra = display extra information at the nodes
+# here "106" was chosen for our binary model
+# but can just choose "auto" to automatically select too
+
+# try tuning hyper-parameters to get higher accuracy
+tree.control <- rpart.control(minsplit = 6, minbucket = round(5/3), cp = 0, maxdepth = 3)
+  # this method did not enhance the model's accuracy so will comment out 
+  # perhaps the model could not be refined any more
+
+# making predictions
+# NOTE: output of predict() directly provides class labels in decision tree classifiers.
+#Ie, no need to apply a threshold like we did for our logistic regression model before.
+tree.prediction.test <- predict(tree.model, newdata = ovarian.dataset.test, type = 'class', control = tree.control)
+  # tree.model is the object stored after model estimation 
+  # newdata is the data that's used to make the prediction 
+  # type = 'class' for the classification type of prediction 
+
+t.tree <- table(ovarian.dataset.test$diagnosis, tree.prediction.test)
+  # generating the confusion matrix for the test set based on the predictions
+t.tree
+
+accuracy.tree = (t.tree[2,2] + t.tree[1,1]) / (t.tree[2,2] + t.tree[1,2] + t.tree[1,1] + t.tree[2,1])
+precision.tree = (t.tree[2,2] / (t.tree[2,2] + t.tree[1,2]))
+recall.tree = (t.tree[1,1] / (t.tree[1,1] + t.tree[2,1]))
+
+paste('Accuracy: ', round(accuracy.tree, 6))
+paste('Precision: ', round(precision.tree, 6)) 
+paste('Recall: ', round(recall.tree, 6)) 
+
+```
 
 ```{r}
- 
+# 3.6.2 Repeate 3.6.1 but with top 5 PCs
+# same thing from Q3.2 here
+data.pca2 <- prcomp(ovarian.dataset.train[,features], center = TRUE, scale. = TRUE)
+summary(data.pca2)
+
+top_PCs <- data.pca2$x[,1:5]
+
+test.predict <- predict(data.pca2, ovarian.dataset.test)
+ovarian.dataset.train$diagnosis <- as.factor(ovarian.dataset.train$diagnosis)
+
+# next, create a dataframe with the PC and the target variable 
+df_pca <- data.frame(top_PCs, diagnosis = ovarian.dataset.train$diagnosis)
+
+
+# now fit the decision tree model with df_pca
+# here diagnosis = ovarian.dataset.train$diagnosis which is the target variable  
+tree.model.pca <- rpart(diagnosis~. , data = df_pca, method = 'class')
+# making a decision tree plot
+rpart.plot(tree.model.pca, extra = 106)
+
+
+# make predictions on the training set based on the decision tree model developed by the top PCAs
+tree.prediction.test.pca <- predict(tree.model.pca, newdata = as.data.frame(test.predict), type = 'class')
+
+t.tree.pca <- table(ovarian.dataset.test$diagnosis, tree.prediction.test.pca)
+t.tree.pca
+
+accuracy.tree.pca = (t.tree.pca[2,2] + t.tree.pca[1,1]) / (t.tree.pca[2,2] + t.tree.pca[1,2] + t.tree.pca[1,1] + t.tree.pca[2,1])
+precision.tree.pca = (t.tree.pca[2,2] / (t.tree.pca[2,2] + t.tree.pca[1,2]))
+recall.tree.pca = (t.tree[1,1] / (t.tree[1,1] + t.tree[2,1]))
+
+paste('Accuracy: ', round(accuracy.tree.pca, 6))
+paste('Precision: ', round(precision.tree.pca, 6)) 
+paste('Recall: ', round(recall.tree.pca, 6)) 
+
 ```
+
+# 3.6.3 Compare results of clustering & classification
+*ANSWER:*
+*Comparing the results from 3.6.1 and 3.6.2, we noticed that the non-PCA model actually performed better with higher accuracy and precision.*
+*The accuracy of using decision tree was 93.9%, but with using the top 5 PCs it was 95.2%.*
+
+*This means that perhaps using the decision tree classifier without PCA analysis is good enough for this data set. Again, the use of PCA can lead to loss of information and worsen the performance of classifier, especially when we only chose the top 5 PCs in our analysis. Some of the variance in the original training data set could be important for classification and was lost during the process.*
+
+*It is also worth noting that the overall accuracy and precision of the decision tree classifier is LOWER than that of the logistic regression model, and this is not uncommon or surprising*
+*A main reason for this is because decision tree models usually perform poorly on imbalanced data sets (our data set is imbalanced), since the tree may favour the majority class a lot. Other factors such as linearity, overfitting, and dimensionality also play a factor in the performance of decision tree models. For this particular data set, we would not consider using the decision tree model over the logistic regression model we made earlier, but it was still a good practice to experiment different models and compare their performance to determine the best fit.*
+
+*Note that we did not do pruning, i.e. parameter control, in our decision tree. It didn't improve our model, however more iterations could be done in the future to increase the accuracy.*
