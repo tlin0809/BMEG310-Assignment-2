@@ -1,16 +1,19 @@
 ---
-title: "Assignment_2"
-author: "Mona Behrouzian, Traye Lin, Maya Ansu"
+title: "Assignment 2"
+author: "Group 28: Mona Behrouzian, Traye Lin, Maya Ansu"
 date: "October 22, 2023"
-output: pdf_document
+output:
+  pdf_document: default
+  word_document: default
 ---
 
-Set up code
+
 ```{r setup, include=FALSE}
+#Set up code
 knitr::opts_chunk$set(echo = TRUE)
 
 #code from TA to make sure my commented code does not fall off the PDF page
-knitr::opts_chunk$set(tidy.opts=list(width.cutoff=60), tidy=TRUE)
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
 
 setwd("C:\\Users\\monab\\Documents\\R")
 
@@ -67,7 +70,7 @@ which(c.sum.pca >= 0.9)[1]
 #install.packages("devtools") #in console
 library(devtools)
 #install.packages("remotes") #in console
-remotes::install_github("vqv/ggbiplot")
+#remotes::install_github("vqv/ggbiplot") #in console
 library(ggbiplot)
 library(ggplot2)
 library(plyr)
@@ -76,7 +79,7 @@ library(grid)
 
 ggbiplot(ovarian.pca, choices = c(1,2), groups = ovarian.dataset$diagnosis)+
   ggtitle("Observations for PC1 and PC2")+
-  theme(plot.title = element_text(hjust = 0.5)) #centers the title
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 ## Q1.4. Can you plot the "area" and "concavity" features associated with the cells?
@@ -90,7 +93,7 @@ Concavity <- ovarian.dataset$concavity
 ggplot(ovarian.dataset)+
   geom_point(aes(x=Area, y=Concavity, color = Diagnosis))+
   ggtitle("Area vs Concavity Features")+
-  theme(plot.title = element_text(hjust = 0.5)) #centers the title
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 
 ## Q1.5. What is the difference between the two plots? Which one gives you better separation between the classes and why?
@@ -116,7 +119,7 @@ Note: When comparing model predictions to true labels, obtain a confusion matrix
 #using code from the webpage linked in tutorial 2 by datanovia and factoextra
 
 #install.packages("factoextra") # for beautiful graph of clusters
-library(factoextra) #load library
+library(factoextra)
 
 #must scale data first
 ovarian.features <- scale(ovarian.dataset[,c(3:32)]) 
@@ -170,9 +173,10 @@ sprintf("Recall is: %f percent", recall)
 ten.runs <- c(1:10) #initialize a variable
 
 for(i in 1:10){
-  kmeans2 <- kmeans(ovarian.features, 2, nstart = 25) #2 for 2 clusters, >=25 recommended for nStart
+  #2 for 2 clusters, >=25 recommended for nStart
+  kmeans2 <- kmeans(ovarian.features, 2, nstart = 25) 
   cluster <- kmeans2$cluster
-  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint.
 
   #create confusion matrix using table() function
   confusionMatrix <- table(predicted.diagnosis, expected.diagnosis)
@@ -245,8 +249,11 @@ sprintf("Mean Accuracy across the 10 runs (but using top 5 PCs) is: %f percent",
 Set up:
 ```{r}
 #Divide your data into training and test sets using the following command:
-ovarian.dataset.train <- ovarian.dataset[sample(nrow(ovarian.dataset))[1:(nrow(ovarian.dataset)/2)],]
-ovarian.dataset.test <- ovarian.dataset[sample(nrow(ovarian.dataset))[(nrow(ovarian.dataset)/2):(nrow(ovarian.dataset))],]
+temp1<- ovarian.dataset[sample(nrow(ovarian.dataset))[1:(nrow(ovarian.dataset)/2)],]
+ovarian.dataset.train <- temp1
+
+temp2<- ovarian.dataset[sample(nrow(ovarian.dataset))[(nrow(ovarian.dataset)/2):(nrow(ovarian.dataset))],]
+ovarian.dataset.test <- temp2
 #"sample" randomly takes half of the data as training data, other half for testing 
 
 # install.packages('ISLR') #in console
@@ -336,6 +343,7 @@ recall <- tb/(tb+fm)*100
 sprintf("Recall is: %f", recall)
 ```
 *ANSWER: Thus, the accuracy, precision, and recall of our model all seems to be 100% - which makes sense because we are testing our model with the training set we used to build the model in the first place!*
+
 
 PART 2: Compare the performance of the classifier on the training and test set and provide a reason as to why one is better than the other.
 ```{r}
@@ -454,9 +462,9 @@ predict <- prediction(pred.prob, ovarian.dataset$diagnosis, label.ordering=c("B"
 perform <- performance(predict,"tpr","fpr")
 plot(perform,colorize=TRUE)
 title("ROC Curve of Logistic Regression Model")
+#This will generate an ROC curve of the performance of the classifier for a range of thresholds. 
+#Take a look at https://towardsdatascience.com/understanding-auc-roc-curve-68b2303cc9c5 for a summary of ROC curves.
 ```
-This will generate an ROC curve of the performance of the classifier for a range of thresholds. Take a look at https://towardsdatascience.com/understanding-auc-roc-curve-68b2303cc9c5 for a summary of ROC curves.
-
 Given our ROC curve, what would you say it tells us about the overlap of the two classes? What can we say about the model's separability? How does an ROC curve tell us more about the model's performance than a single sensitivity/specificity measure?
 
 *ANSWER:*
