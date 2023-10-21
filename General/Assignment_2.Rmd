@@ -5,15 +5,13 @@ date: "10/10/2023"
 output: pdf_document
 ---
 
+Set up code
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 #code from TA to make sure my commented code does not fall off the PDF page
 knitr::opts_chunk$set(tidy.opts=list(width.cutoff=80), tidy=TRUE)
-```
 
-
-```{r}
 setwd("C:\\Users\\monab\\Documents\\R")
 
 ovarian.dataset <- read.delim("ovarian.data", sep=",", header = FALSE)
@@ -21,9 +19,6 @@ features <- c("perimeter", "area", "smoothness", "symmetry", "concavity", paste(
 names(ovarian.dataset) <- c("cell_id", "diagnosis", features) 
 # paste0(features,"_mean"), paste0(features,"_se"), paste0(features,"_worst"))
 
-```
-
-```{r}
 #getting a sense of the data that has been loaded
 #columns are: ID (not a feature), diagnosis plus the 5 variables & 25 proteins (ie 30 features)
 
@@ -32,7 +27,7 @@ names(ovarian.dataset) <- c("cell_id", "diagnosis", features)
 
 # Q1. DIMENSIONALITY REDUCTION
 ## Q1.1. Perform PCA on the features of the dataset. How much of the variation in the data is associated with PC1?
-### 42.8% of the variation in the data is associated with PC1 
+*ANSWER: 42.8% of the variation in the data is associated with PC1*
 ```{r}
 # PCA code from tutorial 1. columns 3 to 32 only are features
 # scales and centers the data, required for PCA
@@ -45,7 +40,7 @@ summary(ovarian.pca)
 ```
 
 ## Q1.2. You want to represent 90% of the variance in the data by dimensionality reduction. How many PCs do you need to achieve this? In other words, what would be the dimensionality of the reduced feature space so that you preserve 90% of the variability in the data?
-### Need 9 PCs for 90% of the variance
+*ANSWER: Need 9 PCs for 90% of the variance*
 ```{r}
 # we are looking for a cumulative proportion of variance of 90%
 
@@ -63,14 +58,13 @@ c.sum.pca <- cumsum(prop.pca)
 
 # use "which" function to find 1st instance when the cumsum is >=90% 
 which(c.sum.pca >= 0.9)[1]
-
 ```
 ## Q1.3. In a 2-D plot, can you plot the observations corresponding to the first two important PCs? Note, use two different colors to represent the two classes of cells.
-
+*ANSWER: See plot below*
 ```{r}
-#install.packages("devtools")
+#install.packages("devtools") #in console
 library(devtools)
-#install.packages("remotes")
+#install.packages("remotes") #in console
 remotes::install_github("vqv/ggbiplot")
 library(ggbiplot)
 library(ggplot2)
@@ -82,36 +76,36 @@ ggbiplot(ovarian.pca, choices = c(1,2), groups = ovarian.dataset$diagnosis)
 ```
 
 ## Q1.4. Can you plot the "area" and "concavity" features associated with the cells?
+*ANSWER: See plot below*
 ```{r}
-#ASK TA : confirm it is okay that we used ggplot? does it look okay? -> yes its okay and yes it looks good 
-
 library(ggplot2)
 Diagnosis <- ovarian.dataset$diagnosis
+Area <- ovarian.dataset$area
+Concavity <- ovarian.dataset$concavity
+
 ggplot(ovarian.dataset)+
   geom_point(aes(x=Area, y=Concavity, color = Diagnosis))
-
 ```
 
 ## Q1.5. What is the difference between the two plots? Which one gives you better separation between the classes and why?
-```{r}
-# the first plot gives better separation.
+*The clustered plot gives better separation compared to the second plot. This makes sense because the clustered plot used PCA to determine which two features define the most variance in the data set, whereas just ploting area vs concavity is simply selecting two features to plot at random.*
+*PCA determines new axes that gives the most variance in our dataset so we are better able to cluster our observations.* 
 
-# LATERRRRRRRRRRRRRRRRR
-
-```
-
-## BONUS: Q1.6 (later! i think the TA said it is just 1 line of code)
+## BONUS: Q1.6 
+(later! i think the TA said it is just 1 line of code)
 
 ```{r}
 #LATERRRRRRRRRRRR
 ```
 
 
+------------------------------------------------------------------------------------------------------------
+
 # Q2. CLUSTERING
-*When comparing model predictions to true labels, obtain a confusion matrix and include this result in your submission. You can obtain this by using the table() function like so: table(predictions, labels)*
+Note: When comparing model predictions to true labels, obtain a confusion matrix and include this result in your submission. You can obtain this by using the table() function like so: table(predictions, labels)
 
-## Q2.1. Apply kmeans clustering on the data and identify two clusters within your dataset. What is the concordance between the clusters that you have identified and the true labels of the cells (Benign vs Malignant).
-
+## Q2.1 Part 1: Apply kmeans clustering on the data and identify two clusters within your dataset. 
+*ANSWER: See clusters in plot below* 
 ```{r}
 #using code from the webpage linked in tutorial 2 by datanovia and factoextra
 
@@ -128,320 +122,309 @@ kmeans2 <- kmeans(ovarian.features, 2, nstart = 25)
 #plotting results
 fviz_cluster(kmeans2, data = ovarian.features)
              
-
-#print(km.res) # Print the results
+# Print the results
+#print(km.res)
 ```
-```{r}
-# What is the concordance between the clusters that you have identified and the true labels of the cells (Benign vs Malignant)?
 
-#convert the clusters into diagnosis labels 
+PART 2: What is the concordance between the clusters that you have identified and the true labels of the cells (Benign vs Malignant).
+*ANSWER: accuracy, precision, and recall listed below.*
+```{r}
+#First must convert the clusters into diagnosis labels 
 cluster <- kmeans2$cluster
 predicted.diagnosis <- factor(ifelse(cluster == 1, "M", "B")) #code from Hint
 expected.diagnosis <- factor(ovarian.dataset$diagnosis)
 
-#Install required packages
-#install.packages('caret')
-library(caret) #library needed to create confusion matrix
+# #Install required packages
+# #install.packages('caret')
+# library(caret) #library needed to create confusion matrix
 
-#create confusion matrix
-confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
-confusion.matrix
+#create confusion matrix using table() function
+confusionMatrix <- table(predicted.diagnosis, expected.diagnosis)
+confusionMatrix
 
+tb <- confusionMatrix[1,1] #true benign
+tm <- confusionMatrix[2,2] #true malignant 
+fb <- confusionMatrix[1,2] #false benign
+fm <- confusionMatrix[2,1] #false malignant 
+
+acc <- (tb+tm)/(tb+fb+fm+tm)*100
+sprintf("Accuracy is: %f percent", acc)
+
+prec <- tb/(tb+fb)*100
+sprintf("Precision is: %f percent", prec)
+
+recall <- tb/(tb+fm)*100
+sprintf("Recall is: %f percent", recall)
 ```
 
 ## Q2.2. Repeat the kmeans analysis 10 times and report the mean accuracy across the 10 runs. Why are the results different in each run?
-
+*ANSWER: The results differ each time you run kmeans, because this algorithm randomly picks initial cluster centers, and then iterates to minimize the within-cluster sum of squares error.* 
+*In other words, the mean accuracy across the 10 runs differs every time you run k-means.*
 ```{r}
-### ASK TA!!! why is it giving 92% or 100-92% each time??? is that the whole point? -> fix code to subtract from 100%
-
-ten.runs <- c(1:10)
+ten.runs <- c(1:10) #initialize a variable
 
 for(i in 1:10){
-  kmeans2 <- kmeans(ovarian.features, 2, nstart = 25)
+  kmeans2 <- kmeans(ovarian.features, 2, nstart = 25) #2 for 2 clusters, >=25 recommended for nStart
   cluster <- kmeans2$cluster
   predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
-  # try mean(** == ***)
-  confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
-  accuracy <- confusion.matrix$overall['Accuracy']
+
+  #create confusion matrix using table() function
+  confusionMatrix <- table(predicted.diagnosis, expected.diagnosis)
+
+  tb <- confusionMatrix[1,1] #true benign
+  tm <- confusionMatrix[2,2] #true malignant 
+  fb <- confusionMatrix[1,2] #false benign
+  fm <- confusionMatrix[2,1] #false malignant 
+  
+  accuracy <- (tb+tm)/(tb+fb+fm+tm)
+
   ten.runs[i] <- accuracy
-  ### fix 
+  #TA:  fix code to subtract from 100%
 }
 ten.runs*100
 
-mean(ten.runs)*100
+sprintf("Mean Accuracy across the 10 runs is: %f percent", mean(ten.runs)*100)
 ```
 
 ## Q2.3. Repeat the same analysis but with the top 5 PCs.
-
 ```{r}
-#option 2 
-
 ten.runs.pca <- c(1:10)
 
 for(i in 1:10){
   data.kmean.pca <- kmeans(ovarian.pca$x[,1:5], 2, nstart = 25)
   cluster <- data.kmean.pca$cluster
-  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint\
-  # try the thing
-  confusion.matrix <- confusionMatrix(predicted.diagnosis, expected.diagnosis)
-  accuracy <- confusion.matrix$overall['Accuracy']
+  predicted.diagnosis <- factor(ifelse(cluster == 1, "B", "M")) #code from Hint
+
+  #create confusion matrix using table() function
+  confusionMatrix <- table(predicted.diagnosis, expected.diagnosis)
+
+  tb <- confusionMatrix[1,1] #true benign
+  tm <- confusionMatrix[2,2] #true malignant 
+  fb <- confusionMatrix[1,2] #false benign
+  fm <- confusionMatrix[2,1] #false malignant 
+  
+  accuracy <- (tb+tm)/(tb+fb+fm+tm)
   ten.runs.pca[i] <- accuracy
-  ## fix 
+  #TA:  fix code to subtract from 100%
 }
 ten.runs.pca*100
 
-mean(ten.runs.pca)*100
-
+sprintf("Mean Accuracy across the 10 runs (but using top 5 PCs) is: %f percent", mean(ten.runs.pca)*100)
 ```
+
 ## Q2.4. Compare the results between Q2.2. and Q2.3.
-# The results get worse! Why? Perhaps it was overfitted 
+*ANSWER: The mean accuracy across the 10 runs was about 50% for both using k-means for clustering the original data set AND for clustering the top 5 principle components*
+*These similar results suggest that the top 5 PCs capture enough variance as compared to including all the features.*
+*In other words, the top 5 PCs do a good job at representing the variance of the whole data set.*
 
 
-### Q3. CLASSIFICATION
+# Q3. CLASSIFICATION
+
+Set up:
 ```{r}
 #Divide your data into training and test sets using the following command:
 ovarian.dataset.train <- ovarian.dataset[sample(nrow(ovarian.dataset))[1:(nrow(ovarian.dataset)/2)],]
 ovarian.dataset.test <- ovarian.dataset[sample(nrow(ovarian.dataset))[(nrow(ovarian.dataset)/2):(nrow(ovarian.dataset))],]
+#"sample" randomly takes half of the data as training data, other half for testing 
 
 # install.packages('ISLR') #in console
-require(ISLR)
+#require(ISLR)
+
+#Need to see how our output is dependent on our input. To do that, we can use correlation, 
+# ie how much the variation in our output is realted to our input. 
+#Or, if i change the input, how much that affects the output.
+
+# # install this for correlation install.packages('corrplot')
+# library(corrplot)
+# 
+# correlations <- cor(ovarian.dataset.train[, 3:32])
+# #correlations
+# 
+# corrplot(correlations, method = "circle")
+
+#Now, we can see the correlation plot above. We used circles. Rows and cols are features. 
+#We are measuring correlation between alllll the pairs of features. 
+#Larger the circle, higher the correlation. Dark blue means huge correlation with the data
 ```
-"sample" randomly takes half of the data as training data, other half for testing 
-
-
-Need to see how our output is dependent on our input. To do that, we can use correlation, ie how much the
-variation in our output is realted to our input. Or, if i change the input, how much that affects the output.
-```{r}
-# install this for correlation install.packages('corrplot')
-library(corrplot)
-
-correlations <- cor(ovarian.dataset.train[, 3:32])
-#correlations
-
-corrplot(correlations, method = "circle")
-
-```
-Now, we can see the correlation plot above. We used circles. Rows and cols are features. We are measuring correlation between alllll the pairs of features. Larger the circle, higher the correlation. Dark blue means huge correlation with the data
 
 ### Q3.1. Design a logistic regression classifier to identify (differentiate) benign and malignant cells. 
-Report the performance of the classification technique on the training and test sets. 
-You can report accuracy, precision and recall. 
-Compare the performance of the classifier on the training and test set and provide a reason as to why one is better than the other.
-
-??????? like the lecture suggestion do we need to review our training set?
-if so, should we just look at the distribution of the data using box and whisker plots and use correlation plots?? like the tutorial showed? 
-we didnt go deep into analyzing the results and how it affects what algorithm we use on the data 
-
-3.1 use logistic regression, like the tutorial 
-show the table!!! must! graded!
-based on the table, can calculate several things : a and p and r
-but dont do it manually. use code.
-
+Part 1: Report the performance of the classification technique on the training and test sets. You can report accuracy, precision and recall. 
 ```{r}
 #We need to first convert all the char variables to be numbers (help from TA!)
 #note we don't know if M becomes 1 or 0, vice versa for B. We just trust the function.
 ovarian.dataset.train$diagnosis <- as.factor(ovarian.dataset.train$diagnosis)
 
-diagnosis.train <- ovarian.dataset.train$diagnosis
-```
+expected <- ovarian.dataset.train$diagnosis
 
+#trying to scale the data first, but gives errors!
+# ovarian.dataset.train <- as.data.frame(scale(ovarian.dataset.train[3:32]))
+# ovarian.dataset.test <- as.data.frame(scale(ovarian.dataset.test[3:32]))
 
-```{r}
 #Creating the logistic regression model.
 #using the binomial argument to make it clear that the intent is to git a logistic regression model
-# the "." means we are taking all the features, but not including cell_id 
-glm.train <- glm(diagnosis.train ~. - cell_id - diagnosis, data = ovarian.dataset.train, family = binomial)
-summary(glm.train)
+# the "." means we are taking all the features, but not including cell_id nor diagnosis
+log.reg.model <- glm(expected ~. - cell_id - diagnosis, data = ovarian.dataset.train, family = binomial)
+summary(log.reg.model)
 
 #note that this gives the error:
 # "glm.fit: algorithm did not converge glm.fit: fitted probabilities numerically 0 or 1 occurred"
 #but, that just means that the function was able to perfectly separate the variable into 0's and 1's.
 #this is what we wanted!
-#also the assignment says dont worry if the model does not converge 
 ```
-Summary similar to what we saw for linear reg., eg p values etc. 
-Note that ALLLLL the p-values are so HIGH!
-Thus, none of the coefficients are significant here. 
+Note that ALLLLL the p-values are so HIGH! Thus, none of the coefficients are significant here. 
 To improve the model, you would drop the features based on which ones have high/bad p value 
 
-
 We now have the model trained, but need to get the prediction from it.
-Need to extract the probabilities from the model. Using the prediction function!
-If you dont use the "type", it will NOT GIVE YOU THE PROBABILITY!!!!
+Need to extract the probabilities from the model, using the prediction function!
 ```{r}
 # input our model, then features, then the type. If you don't use the type, it will NOT GIVE YOU THE PROBABILITY!!!!
-glm.probs.train <- predict(glm.train, ovarian.dataset.train, type = "response")
-#i got an error when i only used col 3:32 of the dataset, asking that "cell_id" was not found... 
+probabilities <- predict(log.reg.model, ovarian.dataset.train, type = "response")
+#the function knows which features to use in the dataset since we set it up in glm
 
-glm.probs.train[1:5]
+probabilities[1:5]
 ```
 These probabilities are very far from 0.5, ie they are extremely close to 0 or 1, which is good! Our model is classifying strongly. 
 
 So we have the probabilities, but how to convert them to labels? 
 Consider the typical s-shape logistic reg curve. If the prob is >0.5 it is yes, <0.5 it is 0. Because it is binary. 
-This threshold is dependent on the application.
-This will come up on the assignment as ROC.
-
 We simply need to use ifelse to do this. It will convert each of the probabilities to the B or M label.
 ```{r}
-glm.pred.train <- ifelse(glm.probs.train > 0.5, "M", "B")
+prediction <- ifelse(probabilities > 0.5, "M", "B")`
 
-#attach(ovarian.dataset.train)
-
-prediction <- glm.pred.train
 expected <- ovarian.dataset.train$diagnosis
 
-table(prediction, expected)
+confusionMatrix <- table(prediction, expected)
+confusionMatrix
 ```
-??? concerned because there are NO false positives or negatives??? 
-Does not make sense because the p-values we got were high, which is supposed to be bad for prediction 
-. 
+There are no false positives/malignant or false negatives/benign. This makes sense because we are testing against our training set, so of course our model seems to classify "perfectly".
 
 Using this table, we can manually calculate many statistics such as accuracy, precision, and recall of the prediction.
-Here we get the avg. Comparing the predictions with the average data.
 ```{r}
-confusionMatrix <- table(prediction, expected)
-
 tb <- confusionMatrix[1,1] #true benign
 tm <- confusionMatrix[2,2] #true malignant 
 fb <- confusionMatrix[1,2] #false benign
 fm <- confusionMatrix[2,1] #false malignant 
 
-acc <- (tb+tm)/(tb+fb+fm+tm)
+acc <- (tb+tm)/(tb+fb+fm+tm)*100
 sprintf("Accuracy is: %f", acc)
 
-prec <- tb/(tb+fb)
+prec <- tb/(tb+fb)*100
 sprintf("Precision is: %f", prec)
 
-recall <- tb/(tb+fm)
+recall <- tb/(tb+fm)*100
 sprintf("Recall is: %f", recall)
-
-#mean(glm.pred.train == expected)
-#this code works in this case because it is a binary. 
 ```
-??? Thus the accuracy of our model is 100% THATS NOT POSSIBLE
+*ANSWER: Thus, the accuracy, precision, and recall of our model all seems to be 100% - which makes sense because we are testing our model with the training set we used to build the model in the first place.*
 
-How could we improve the model? Drop the features with high p-value.
-
-
-Compare the performance of the classifier on the training and test set and provide a reason as to why one is better than the other.
+PART 2: Compare the performance of the classifier on the training and test set and provide a reason as to why one is better than the other.
 ```{r}
-#repeating all the steps as above, except putting our test set in instead of training 
+#repeating all the steps as above, except putting our *test* set in instead of training 
 
-glm.probs.test <- predict(glm.train, ovarian.dataset.test, type = "response")
+ovarian.dataset.test$diagnosis <- as.factor(ovarian.dataset.test$diagnosis)
+expected.test <- ovarian.dataset.test$diagnosis
 
-glm.probs.test[1:5]
+#log.reg.model.test <- glm(expected.test ~. - cell_id - diagnosis, data = ovarian.dataset.test, family = binomial)
+#summary(log.reg.model.test)
 
-glm.pred.test <- ifelse(glm.probs.test > 0.5, "M", "B")
+probabilities.test <- predict(log.reg.model, ovarian.dataset.test, type = "response")
 
-prediction <- glm.pred.test
-expected <- ovarian.dataset.test$diagnosis
+probabilities.test[1:5]
 
-table(prediction, expected)
+prediction.test <- ifelse(probabilities.test > 0.5, "M", "B")
 
-confusionMatrix <- table(prediction, expected)
+confusionMatrix.test <- table(prediction.test, expected.test)
+confusionMatrix.test
 
-tb <- confusionMatrix[1,1] #true benign
-tm <- confusionMatrix[2,2] #true malignant 
-fb <- confusionMatrix[1,2] #false benign
-fm <- confusionMatrix[2,1] #false malignant 
+tb <- confusionMatrix.test[1,1] #true benign
+tm <- confusionMatrix.test[2,2] #true malignant 
+fb <- confusionMatrix.test[1,2] #false benign
+fm <- confusionMatrix.test[2,1] #false malignant 
 
-acc <- (tb+tm)/(tb+fb+fm+tm)
-sprintf("Accuracy is: %f", acc)
+acc <- (tb+tm)/(tb+fb+fm+tm)*100
+sprintf("(3.1) Accuracy is: %f", acc)
 
-prec <- tb/(tb+fb)
-sprintf("Precision is: %f", prec)
+prec <- tb/(tb+fb)*100
+sprintf("(3.1) Precision is: %f", prec)
 
-recall <- tb/(tb+fm)
-sprintf("Recall is: %f", recall)
+recall <- tb/(tb+fm)*100
+sprintf("(3.1) Recall is: %f", recall)
 
 ```
-
-
+*ANSWER: the accuracy, precision, and recall from running our test set through our model are very high - but not all 100% like we say before.*
+*This makes sense, because it's the first time the model is seeing this dataset, so it's expected to make some mistakes in classifying.*
 
 ### Q3.2. Repeat the same task as Q3.1. with the top 5 PCs.
 
-welllll need to figure out q3.1 first...
-
-
-??? pseudocode would be run PCA on the (raw?) training data, then pull PC1-5 to test the accuracy of the test set 
-
-most correct way!!!!!!: 
+Tutorial: most correct way!!!!!!: 
 split data first
 apply pca on the training data
 use the PCs from the training set to test the accuracy of the test set! 
 
 ```{r}
-ovarian.pca.train <- prcomp(ovarian.dataset.train[,c(3:32)], center = TRUE, scale. = TRUE)
+#Apply PCA on raw training set
+train.pca <- prcomp(ovarian.dataset.train[,c(3:32)], center = TRUE, scale. = TRUE)
+summary(train.pca)
+
+top5PCs <- train.pca$x[,1:5] #pull out the top 5 principle components 
+
+#Converting test set to compare with.
+test.pca <- predict(train.pca, ovarian.dataset.test[,c(3:32)], type = "response")
 
 ovarian.dataset.train$diagnosis <- as.factor(ovarian.dataset.train$diagnosis)
 
-diagnosis.train <- ovarian.dataset.train$diagnosis
+top5PCs_frame <- data.frame(top5PCs, diagnosis = ovarian.dataset.train$diagnosis)
+test.pca_frame <- data.frame(test.pca, diagnosis = ovarian.dataset.test$diagnosis)
 
-top5PCs <- as.data.frame(ovarian.pca.train$x[,1:5])
+log.reg.model.pca <- glm(diagnosis ~., data = top5PCs_frame, family = binomial)
+summary(log.reg.model.pca)
 
-glm.train <- glm(diagnosis.train ~. - cell_id - diagnosis, data = top5PCs, family = binomial)
-##OR SHOULD IT BE THIS:
-#glm.train <- glm(diagnosis.train ~ PC1 + PC2 + PC3 + PC4 + PC5, data = ovarian.dataset.train, family = binomial)
+probabilities.pca <- predict(log.reg.model.pca, test.pca_frame, type = "response")
+probabilities.pca[1:5]
 
-summary(glm.train)
+prediction <- ifelse(probabilities.pca > 0.5, "M", "B")
 
-#summary(ovarian.pca.train)
-
-#repeating all the steps as above, except putting our test set in instead of training 
-
-glm.probs.pca <- predict(glm.train, top5PCs, type = "response")
-
-glm.probs.pca[1:5]
-
-glm.pred.pca <- ifelse(glm.probs.pca > 0.5, "M", "B")
-
-prediction <- glm.pred.pca
-expected <- ovarian.dataset.train$diagnosis
-
-table(prediction, expected)
-
-confusionMatrix <- table(prediction, expected)
+confusionMatrix <- table(prediction, ovarian.dataset.test$diagnosis)
+confusionMatrix
 
 tb <- confusionMatrix[1,1] #true benign
 tm <- confusionMatrix[2,2] #true malignant 
 fb <- confusionMatrix[1,2] #false benign
 fm <- confusionMatrix[2,1] #false malignant 
 
-acc <- (tb+tm)/(tb+fb+fm+tm)
-sprintf("Accuracy is: %f", acc)
+acc <- (tb+tm)/(tb+fb+fm+tm)*100
+sprintf("Accuracy using PCA is: %f", acc)
 
-prec <- tb/(tb+fb)
-sprintf("Precision is: %f", prec)
+prec <- tb/(tb+fb)*100
+sprintf("Precision using PCA is: %f", prec)
 
-recall <- tb/(tb+fm)
-sprintf("Recall is: %f", recall)
+recall <- tb/(tb+fm)*100
+sprintf("Recall using PCA is: %f", recall)
 
 ```
 
 
 ### Q3.3. Compare the results between Q3.1. and Q3.2. Do the results get better or worse? Why?
-TA says obvious which data will be better! 
+*ANSWER: The results got BETTER when using PCA. This makes sense, because PCA allowed us to pick the features which describe the most variance in the set, thus making our classifier's performance better.*
 
-```{r}
-# The results got BETTER when using PCA.
-# This makes sense, because PCA allowed us to pick the features which describe the most variance in the set,
-# thus making our classifier's performance better.
+### Q3.4. Compare the results of the clustering (Q2) and classification (Q3) methods. Which one gives you better result?
+TA: you should compare non-pca with non-pca and pca with pca. 
+*ANSWER: For both clustering and classification, we got a higher accuracy when using PCA*
+*For clustering, without PCA we got roughly 50% accuracy, but with PCA, we got similar but typically higher accuracy, roughly 60%.*
+*For classification, without PCA we got 97% accuracy, but with PCA, we got 98%.*
+*Overall, PCA led us to have similar accuracies, but always HIGHER accuracies.*
 
-```
+*This makes sense as PCA allows us to extract the features that describe the most amount of variance in our dataset.*
+*Thus, we can expect to have more accurate models when using PCA.*
 
-### Q3.4. Compare the results of the clustering and classification methods. Which one gives you better result?
+*talk about the centroid and stuff*
 
-??? ie comparing question 2 overall with question 3??? like comparing unsupervised vs supervised?
-
-```{r}
-
-```
+compare accuracy (kmeans and log.reg.model.test) vs accuracy (kmean&pca and log.reg.model&pca)
 
 ### Q3.5. Install the library "ROCR" and load it. Then, run the following lines using your trained logistic regression model:
-
 ```{r}
-pred.prob <- predict(your.model, ovarian.dataset, type="response")
+#install.packages("ROCR") #in console
+library(ROCR)
+pred.prob <- predict(log.reg.model, ovarian.dataset, type="response")
 predict <- prediction(pred.prob, ovarian.dataset$diagnosis, label.ordering=c("B","M"))
 perform <- performance(predict,"tpr","fpr")
 plot(perform,colorize=TRUE)
@@ -449,20 +432,21 @@ plot(perform,colorize=TRUE)
 This will generate an ROC curve of the performance of the classifier for a range of thresholds. Take a look at https://towardsdatascience.com/understanding-auc-roc-curve-68b2303cc9c5 for a summary of ROC curves.
 
 3.5.1. Given our ROC curve, what would you say it tells us about the overlap of the two classes? 
-3.5.2. What can we say about the model's separability? 
-3.5.3. How does an ROC curve tell us more about the model's performance than a single sensitivity/specificity measure?
+*ANSWER: based on the shape, there is very little overlap*
 
+3.5.2. What can we say about the model's separability? 
+*ANSWER: high separability.*
+
+3.5.3. How does an ROC curve tell us more about the model's performance than a single sensitivity/specificity measure?
+*ANSWER: sometimes accuracy alone isngt giving us the info we are looking for. ROC gives robustness *
+*depending on our application, roc tells us what threshold to use *
+*useful for imbalanced problem!!! *
 
 
 ### Q3.6 . Design another classifier (using a different classification method) and repeat Q3.1-3.
 
-part 6: do part 1,2,3 aagain but for another classification model. other options are in tutorial, eg naive base, svm, random forest 
+part 6: do part 1,2,3 again but for another classification model. other options are in tutorial, eg naive base, svm, random forest 
 
-ask the team what model type they want to use! 
 ```{r}
-
+ 
 ```
-
-
-rdh
-
