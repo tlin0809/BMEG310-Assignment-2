@@ -8,6 +8,78 @@ Traye - By comparing the accuracy and precision values from 3.1 and 3.2, we real
 # 3.4
 
 # 3.5
-Traye (FIXXX) - Firstly, this ROC plot indicates that our model has the ideal separability of classes meaning that we have selected the optimal threshold (0.5) for the classification model. This is because the AUC (area under ROC curve) is approximately 1 as seen from the plot, which indicates that the curves for the positive class (Malignant cell in our case) and negative class (Benign cell) don't overlap at all. This means that the model can perfectly distinguish between B and M cells. 
+pred.prob <- predict(data.glm2, ovarian.dataset, type="response")
+predict <- prediction(pred.prob, ovarian.dataset$diagnosis, label.ordering=c("B","M"))
+perform <- performance(predict,"tpr","fpr")
+plot(perform,colorize=TRUE)
 
-# 3.6
+Traye - Firstly, this ROC plot indicates that our model has the ideal separability of classes meaning that we have selected the optimal threshold (0.5) for the classification model. This is because the AUC (area under ROC curve) is approximately 1 as seen from the plot, which indicates that the curves for the positive class (Malignant cell in our case) and negative class (Benign cell) don't overlap at all. This means that the model can perfectly distinguish between B and M cells.
+
+# 3.6.1 Designing a new classifier
+# classification method 
+  # decision tree
+  # type = 'class' for binary model 
+tree.model <- rpart(diagnosis~., data = ovarian.dataset.train, method = 'class')
+rpart.plot(tree.model, extra = 106)
+# extra = display extra information at the nodes
+# here 106 was chosen for our binary model
+# but can just choose "auto" to automatically select too
+
+# try tuning hyper-parameters to get higher accuracy
+#tree.control <- rpart.control(minsplit = 6, minbucket = round(5/3), cp = 0, maxdepth = 3)
+  # this method did not enhance the model's accuracy so will comment out 
+  # perhaps the model could not be refined any more
+
+# making predictions
+# NOTE: output of predict() directly provides class labels in decision tree classifiers; no need to apply a threshold
+tree.prediction.test <- predict(tree.model, newdata = ovarian.dataset.test, type = 'class')
+  # tree.model is the object stored after model estimation 
+  # newdata is the data that's used to make the prediction 
+  # type = 'class' for the classification type of prediction 
+
+t.tree <- table(ovarian.dataset.test$diagnosis, tree.prediction.test)
+  # generating the confusion matrix for the test set based on the predictions
+t.tree
+
+accuracy.tree = (t.tree[2,2] + t.tree[1,1]) / (t.tree[2,2] + t.tree[1,2] + t.tree[1,1] + t.tree[2,1])
+precision.tree = (t.tree[2,2] / (t.tree[2,2] + t.tree[1,2]))
+
+paste('Accuracy: ', round(accuracy.tree, 6))
+paste('Precision: ', round(precision.tree, 6)) 
+
+# 3.6.2 Repeate 3.6.1 but with top 5 PCs
+# same thing from Q3.2 here
+data.pca2 <- prcomp(ovarian.dataset.train[,features], center = TRUE, scale. = TRUE)
+summary(data.pca2)
+
+top_PCs <- data.pca2$x[,1:5]
+
+test.predict <- predict(data.pca2, ovarian.dataset.test)
+ovarian.dataset.train$diagnosis <- as.factor(ovarian.dataset.train$diagnosis)
+
+# next, create a dataframe with the PC and the target variable 
+df_pca <- data.frame(top_PCs, diagnosis = ovarian.dataset.train$diagnosis)
+
+
+# now fit the decision tree model with df_pca
+# here diagnosis = ovarian.dataset.train$diagnosis which is the target variable  
+tree.model.pca <- rpart(diagnosis~. , data = df_pca, method = 'class')
+# making a decision tree plot
+rpart.plot(tree.model.pca, extra = 106)
+
+
+# make predictions on the training set based on the decision tree model developed by the top PCAs
+tree.prediction.test.pca <- predict(tree.model.pca, newdata = as.data.frame(test.predict), type = 'class')
+
+t.tree.pca <- table(ovarian.dataset.test$diagnosis, tree.prediction.test.pca)
+t.tree.pca
+
+accuracy.tree.pca = (t.tree.pca[2,2] + t.tree.pca[1,1]) / (t.tree.pca[2,2] + t.tree.pca[1,2] + t.tree.pca[1,1] + t.tree.pca[2,1])
+precision.tree.pca = (t.tree.pca[2,2] / (t.tree.pca[2,2] + t.tree.pca[1,2]))
+
+paste('Accuracy: ', round(accuracy.tree.pca, 6))
+paste('Precision: ', round(precision.tree.pca, 6)) 
+
+# 3.6.3 Compare results of clustering & classification
+Traye - Comparing the results form 3.6.1 and 3.6.2, we noticed that the non-PCA model actually performed better with higher accuracy and precision. This means that perhaps using the decision tree classifier without PCA analysis is good enough for this data set. Again, the use of PCA can lead to loss of information and worsen the performance of classifier, especially when we only chose the top 5 PCs in our analysis. Some of the variance in the original train data could be important for classification and was lost during the process. It is also worth noting that the overall accuracy and precision of the decision tree classifier is lower than that of the logistic regression model, and this is not uncommon. A main reason for this is because decision tree models usually perform poorly on imbalanced datasets (our data is imbalanced), since the tree may favor the majority class a lot. Other factors such as linearity, overfitting, and dimensionality also play factor in the performance of decision tree models. For this particular data set, we would not consider using the decision tree model but it was still a good practice to experiment different models and compare their performance to determine the best fit.  
+
