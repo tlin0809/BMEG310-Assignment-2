@@ -3,3 +3,6 @@ https://datacarpentry.org/rr-version-control/03-git-in-rstudio/index.html
 
 Link: Q3-related resources on how to manually get accuracy and precision from table()
 https://rpubs.com/tmartens/classification_metrics
+
+Link: decision tree tutorial 
+https://www.guru99.com/r-decision-trees.html
