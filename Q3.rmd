@@ -1,6 +1,61 @@
+```{r}
+ovarian.dataset.train <- ovarian.dataset[sample(nrow(ovarian.dataset))[1:(nrow(ovarian.dataset)/2)],]
+ovarian.dataset.test <- ovarian.dataset[sample(nrow(ovarian.dataset))[(nrow(ovarian.dataset)/2):(nrow(ovarian.dataset))],]
+
+head(ovarian.dataset.train)
+head(ovarian.dataset.test)
+```
+~. - cell
+
 # 3.1
+```{r}
+
+glm.fit <- glm(as.factor(ovarian.dataset.train$diagnosis) ~.- cell_id, data = ovarian.dataset.train, family = binomial)
+summary(glm.fit)
+glm.probs <- predict(glm.fit, ovarian.dataset.train[, 3:32], type = "response")
+glm.probs[1:5]
+glm.pred <- ifelse(glm.probs>0.5, "B",",M")
+#attach(ovarian.dataset.train)
+table(glm.pred,ovarian.dataset.train$diagnosis)
+
+```
+
+```{r}
+glm.probs <- predict(glm.fit, ovarian.dataset.test, type = "response")
+glm.pred <- ifelse(glm.probs>0.5, "B",",M")
+#attach(ovarian.dataset.train)
+confusion_matrix <- table(glm.pred,ovarian.dataset.test$diagnosis)
+accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+accuracy
+```
+
 
 # 3.2 
+```{r}
+train.pca <- prcomp(ovarian.dataset.train[,c(3:32)], center = TRUE, scale. =TRUE)
+summary(train.pca)
+top_5_.pca <- train.pca$x[,1:5]
+
+test.pca <- predict(train.pca, ovarian.dataset.test, type = "response")
+ovarian.dataset.train$diagnosis <- as.factor(ovarian.dataset.train$diagnosis)
+
+top_5_data <- data.frame(top_5_.pca, diagnois = ovarian.dataset.train$diagnosis)
+test.pca.data <- data.frame(test.pca , diagnosis = ovarian.dataset.test$diagnosis)
+
+glm.pca.model <- glm(diagnois ~., data = top_5_data, family = binomial)
+summary(glm.pca.model)
+
+glm.probs.pca <- predict(glm.pca.model, test.pca.data, type = "response")
+
+
+glm.pred.pca <- ifelse(glm.probs.pca>0.5, "B",",M")
+#attach(ovarian.dataset.train)
+confusion_matrix.pca <- table(glm.pred.pca,ovarian.dataset.test$diagnosis)
+accuracy <- sum(diag(confusion_matrix.pca))/sum(confusion_matrix.pca)
+accuracy
+
+```
+
 
 # 3.3
 
