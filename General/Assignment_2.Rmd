@@ -569,3 +569,10 @@ paste('Recall: ', round(recall.tree.pca, 6))
 *A main reason for this is because decision tree models usually perform poorly on imbalanced data sets (our data set is imbalanced), since the tree may favour the majority class a lot. Other factors such as linearity, overfitting, and dimensionality also play a factor in the performance of decision tree models. For this particular data set, we would not consider using the decision tree model over the logistic regression model we made earlier, but it was still a good practice to experiment different models and compare their performance to determine the best fit.*
 
 *Note that we did not do pruning, i.e. parameter control, in our decision tree. It didn't improve our model, however more iterations could be done in the future to increase the accuracy.*
+
+
+### Contribution
+All of our team members attempted all the questions. We each had a chance to attempt on our own, and then had meetings to compare/help/collaborate.  
+For some subsections, we had some members get a head start and attempt first, eg Maya for 3.1, Traye for 3.6, Mona for 2.1.  
+We all worked together to describe the theory/reasoning for questions and format the document.  
+We all attending office hours and labs.   
