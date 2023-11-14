@@ -1,0 +1,164 @@
+---
+title: "Assignment 3"
+author: "Group 28: Mona Behrouzian, Traye Lin, Maya Ansu"
+date: "November 18, 2023"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+
+```{r setup, include=FALSE}
+#Set up code
+knitr::opts_chunk$set(echo = TRUE)
+
+#code from TA to make sure my commented code does not fall off the PDF page
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
+
+setwd("C:/Users/monab/Documents/R/Assignment3")
+
+RNAseq <- read.csv("single_cell_RNA_seq_bam.sam", nrows=73, sep="\t", header=FALSE, fill=TRUE) 
+#These lines contain tabulated information about the BAM file and the circumstances of its data collection.
+
+head(RNAseq)
+```
+
+# Q1. Sequencing technologies
+## Why are areas of the genome with high GC content are hard to sequence?
+*If a genome has high GC content (i.e. high amount of guanine and cytosine base pairs) then the melting temperature is high as well (due to forming more secondary structures that are very stable). This means it is harder to separate the 2 strands, thus it is harder to do PCR denaturation. If the strands don't separate, they won't be amplified and read in NGS.*
+*Additionally, high GC content in the entire genome influences fragment count, making these specific fragments underrepresented. Signal strength decreases as sequencing continues with high GC.*
+
+*Source: Benjamini Y, Speed TP. Summarizing and correcting the GC content bias in high-throughput sequencing. Nucleic Acids Res. 2012 May;40(10):e72. doi: 10.1093/nar/gks001. Epub 2012 Feb 9. PMID: 22323520; PMCID: PMC3378858.*
+
+# Q2. Global alignment exercise
+## Similar to the approach for Needleman–Wunsch algorithm, find the best global alignment between the two following sequences: ATTCGAC and ATCAC. Use a gap penalty of -2 and the following scoring matrix
+## In your answer, please include the grid table (used for storing the scores and traceback) and also include how you calculated the first top-left 9 elements of the table.
+*see merged PDF on final pages*
+
+# Q3. Looking at the Metadata of an alignment (SAM) file
+## Q3.1. According to the header table in section 1.3 of the BAM/SAM document in the appendix, what do the SN and LN tags indicate?
+*The SN tags indicate the reference sequence name. They all must be distinct.*
+*The LN tags indicate the reference sequence length. It has a range of [1, (2^31) − 1]*
+
+A sequence is any template string of bases to which we can align a read. This includes chromosomes (which are continuous sequences of bases) and new strings resulting from genetic modifications.
+## Q3.2. What is the length of the X chromosome, in bp, for our alignment?
+*The length of the X chromosome is 171031299*
+```{r}
+x_length <- RNAseq$V3[RNAseq$V2 == "SN:X"]
+x_length
+```
+
+
+# Q4. Looking at the Reads of an alignment (SAM) file
+
+Q4.1. How many reads are there in this BAM file?
+*There are 146,346 reads in this BAM file.*
+```{r}
+#load the reads into an R dataframe. Each row contains one read.
+sam <- read.csv("single_cell_RNA_seq_bam.sam", sep="\t", header=FALSE, comment.char="@", col.names = paste0("V",seq_len(30)), fill=TRUE)
+sam <- sam[paste0("V",seq_len(11))]
+
+#dim(sam)
+#head(sam)
+print(nrow(sam))
+```
+ 
+## Q4.2.1 Which column of your dataframe should you look at to find the chromosome to which the read was aligned? 
+*Column 3 shows the "RNAME" which would show us the chromosome to which the read was aligned.*
+
+## 4.2.2 To which BAM data field does the dataframe column "V11" correspond?
+*Column 11 corresponds to the "QUAL" tag, or the base quality, in ASCII format.*
+```{r}
+#Print out the 10th row of the dataframe to look at the format of a read.
+sam[10,]
+#Compare it to the mandatory BAM fields table in section 1.4 of the SAM/BAM documentation in the appendix. 
+#The order of columns in the bam file have been preserved in the dataframe. 
+```
+
+## Q4.3. How many reads in this file align to chromosome X?
+Hint: You can compare a column vector to a constant using logical symbols (==, <, >, etc.) to get a
+column vector of TRUE or FALSE. Remember, when summing, a true symbol is worth "1" while a
+false symbol is worth "0".
+*There are 5,999 reads in this file that align to chromosome X.*
+```{r}
+Xchrom <- which(sam$V3 == 'X') #this is giving the indices of elements that satisfy the condition
+print(length(Xchrom))
+#head(Xchrom)
+```
+# Q4.4. What is the mean base quality (BQ) for reads aligning to chromosome X?
+*65.7 is the mean BQ for reads aligning to chrom X.*
+```{r}
+#HELPPP TA WHERE DO WE SUBTRACT 33 / DO WE NEED TO???
+Xchrom <- sam[sam$V3 == "X", ]
+
+bq_int_x <- sapply(Xchrom$V11, utf8ToInt)
+
+print(mean(bq_int_x))
+```
+
+## Q4.5. Plot the distribution of BQs across all bases and reads as a boxplot. 
+Comment on your observation. 
+Hint: This is similar to a boxplots that was provided in the lecture related to primary analysis. 
+*asdf*
+```{r}
+#HELPPPPPPPPPPPP SOS TA!
+bq_int <- sapply(sam$V11, utf8ToInt)
+
+```
+
+## Q4.6. Referring to section 1.4 of the SAM/BAM documentation, what column contains the leftmost
+mapping position of the reads?
+*Column 4, with the POS tag.*
+
+## Q4.7. In order to transform a BAM file into expression levels for each gene, we need to count the
+number of reads covering a particular location or gene. The protein Hspa8 is located on
+chromosome 9 at bases 40801273 - 40805199. How many reads have their leftmost mapping
+position aligned within these coordinates?
+Hint: you can implement AND logic on two column vectors with "&".
+*119 reads.*
+```{r}
+reads_indices <- which(sam$V3 == '9' & sam$V4 >= 40801273 & sam$V4 <= 40805199)
+reads_pos <- sam[reads_indices,4]
+
+length(reads_pos)
+```
+Mapping quality is an indication of how well a read aligned to the reference genome during
+the alignment step of processing our library data. It is reported as an integer between 0 and 255.
+## Q4.8. How many reads have mapping quality less than 50? 
+*61,527 reads.*
+```{r}
+#*** CONFIRM ITS OUT OF THE WHOLE SAM FILE, NOT CHROMOSOME 9
+mapq_less_50 <- which(sam$V5 < 50)
+length(mapq_less_50)
+```
+
+## Q4.9. What is the mean mapping quality of the reads which have mapping quality less than 50?
+Hint: you can obtain a subset of a dataframe by using df[bool_vec,] where bool_vec contains TRUE/FALSE elements and bool_vec and df have the same number of rows.
+*0.2418125 is the mean mapping quality.*
+```{r}
+reads_mapq_less_50 <- sam$V5[mapq_less_50]
+mean(reads_mapq_less_50)
+```
+
+## Q4.10. (bonus): The genome of the mouse used in this experiment has been edited to include the
+DNA sequence for the protein 'tdTomato', which is a fluorophore. Count the number of reads
+which align to the tdTomato sequence. Assuming that these reads are accurate, would you expect
+this cell to emit fluorescently? What might be the purpose of modifying a genome to include a
+fluorophore?
+Hint: Think about studying cell populations under a microscope.
+*asdf*
+```{r}
+
+```
+
+# Q5. Investigating the Variants
+
+
+next steps:
+- finish q5 separately
+- mona ask q4 subquestions on piazza
+- mona should upload her code so far (and for mutation analysis)
+- traye and maya align with the team code 
+
+- friday ~5pm compare q5 
+- 5:30-7:30 friday OH (all free!) to ask q4.5 !!! and possibly q5 remaining 
