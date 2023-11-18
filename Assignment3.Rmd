@@ -88,10 +88,10 @@ print(length(Xchrom))
 # Q4.4. What is the mean base quality (BQ) for reads aligning to chromosome X?
 *65.7 is the mean BQ for reads aligning to chrom X.*
 ```{r}
-#HELPPP TA WHERE DO WE SUBTRACT 33 / DO WE NEED TO???
+#HELPPP TA WHERE DO WE SUBTRACT 33 / DO WE NEED TO???- asked on piazza
 Xchrom <- sam[sam$V3 == "X", ]
 
-bq_int_x <- sapply(Xchrom$V11, utf8ToInt)
+bq_int_x <- sapply(Xchrom$V11, utf8ToInt)-33
 
 print(mean(bq_int_x))
 ```
@@ -102,8 +102,22 @@ Hint: This is similar to a boxplots that was provided in the lecture related to 
 *asdf*
 ```{r}
 #HELPPPPPPPPPPPP SOS TA!
-bq_int <- sapply(sam$V11, utf8ToInt)
+bq_int <- sapply(sam$V11, utf8ToInt)-33
+bq_int <- t(bq_int)
 
+dim(bq_int)
+
+boxplot(bq_int[,1:10], at = 1:10, xlim = c(1,58), xaxt = 'n')
+boxplot(bq_int[,11:20], at = 11:20, add = TRUE, xaxt = 'n')
+boxplot(bq_int[,21:30], at = 21:30, add = TRUE, xaxt = 'n')
+boxplot(bq_int[,31:40], at = 31:40, add = TRUE, xaxt = 'n')
+boxplot(bq_int[,41:50], at = 41:50, add = TRUE, xaxt = 'n')
+boxplot(bq_int[,51:58], at = 51:58, add = TRUE, xaxt = 'n')
+
+
+axis(1:58, at = 1:58)
+
+#titles later!!! 
 ```
 
 ## Q4.6. Referring to section 1.4 of the SAM/BAM documentation, what column contains the leftmost
@@ -127,7 +141,7 @@ the alignment step of processing our library data. It is reported as an integer 
 ## Q4.8. How many reads have mapping quality less than 50? 
 *61,527 reads.*
 ```{r}
-#*** CONFIRM ITS OUT OF THE WHOLE SAM FILE, NOT CHROMOSOME 9
+#*** CONFIRM ITS OUT OF THE WHOLE SAM FILE, NOT CHROMOSOME 9 - asked on piazza
 mapq_less_50 <- which(sam$V5 < 50)
 length(mapq_less_50)
 ```
@@ -152,13 +166,190 @@ Hint: Think about studying cell populations under a microscope.
 ```
 
 # Q5. Investigating the Variants
+We have used Strelka, which is a variant-calling tool, to find all of the SNPs and short indels in the
+genome of this cell using the BAM file. The variants were then annotated using snpEff to label
+them with information such as which gene they affect and the type of modification they result in
+once the RNA undergoes translation to a protein. The results are in a VCF file (extension '.vcf')
+which is attached. 
+
+Use the following lines of code to obtain the header of the file and a dataframe where each
+row is a variant. As you can see, information in the VCF file is organised by multiple levels of
+character-separated data, so it will take multiple rounds of parsing to extract relevant
+information.
+
+```{r}
+vcf_con <- file("RNA_seq_annotated_variants.vcf", open="r")
+vcf_file <- readLines(vcf_con)
+close(vcf_con)
+vcf <- data.frame(vcf_file)
+header <- vcf[grepl("##", vcf$vcf_file), ]
+factor(header)
+variants <- read.csv("RNA_seq_annotated_variants.vcf", skip=length(header),
+header=TRUE, sep="\t")
+```
 
 
-next steps:
-- finish q5 separately
-- mona ask q4 subquestions on piazza
-- mona should upload her code so far (and for mutation analysis)
-- traye and maya align with the team code 
+## Q5.1 For the first variant (row) in the dataframe, what is the reference allele base at the
+site, and what is the alternative allele called by Strelka?
+Hint: Take a look at the VCF Variant Call Format document in the appendix for details on each
+column name.
+*G and A*
+```{r}
+#do traye's thing
+```
 
-- friday ~5pm compare q5 
-- 5:30-7:30 friday OH (all free!) to ask q4.5 !!! and possibly q5 remaining 
+
+The INFO field is organised into variables by the form 'TAG=value' (see the VCF Variant Call Format document).
+## Q5.2.  Write code to obtain the entirety of the ANN info value contents from the INFO field for the first variant. 
+```{r}
+#split the string with ANN=
+
+ANN_1 = unlist(strsplit(as.character(variants$INFO)[1], "ANN="))[2]
+# BUUUUT i  didnt use grep - use teams code 
+
+print(ANN_1)
+```
+
+Q5.3. Each INFO tag-value pair is detailed in a line of the header, beginning with the tag '##INFO=
+<ID=VARIABLE, ...'. Look for the header entry starting with '##INFO=<ID=ANN, ...' which details the
+format of the ANN value contents. This tag-value pair contains the results of the annotations
+found by snpEff. 
+Based on the ANN value of the first variant, what does the 'Annotation' field tell us about this variant?
+```{r}
+#need to split up the annotation with commas
+strsplit(as.character(ANN_1), ",")
+
+# SOS IS IT ENOUGH TO JUST SAY INTRONIC VARIANT
+```
+
+Hint: snpEff can return multiple annotation entries for the same variant because some variants
+may have multiple possible effects. The first annotation entry is the most confident/important
+and, resultantly, you should only look at the first entry to answer this and all subsequent
+question. You can use strsplit() again with ',' separation character if you wish to look at each of the
+ANN entries separately.
+Hint: Refer to the snpEff documentation in the appendix for a list of snpEff annotation label
+names and summaries of their effects.
+
+
+Q5.4. Perform the parsing done in Q5.1-3 again on variant line 683. What gene would this variant affect?
+```{r}
+ANN_683 = unlist(strsplit(as.character(variants$INFO)[683], "ANN="))[2]
+strsplit(as.character(ANN_683), ",")
+```
+*Rps19 gene. We can see it is this gene from the annotations printed above.* (TA said this was fine, non need to extract -> maya)
+
+Q5.5. Within the entire VCF file, how many HIGH impact variants we see in total? 
+```{r}
+high_impacts <- grep("HIGH", variants$INFO)
+
+length(high_impacts)
+
+```
+
+Q5.6. What is a frameshift variant? Does it have a greater or lesser effect on the resultant protein than a missense variant? Why? 
+*lol*
+
+Q5.7. 
+We can divide variants into two broad categories: intronic/intergenic and exonic. 
+Count the number of potential intronic variants AND intergenic! 
+What do you notice about the number of intronic variants (compared to overall number of variants)?
+-------> overall number aka the number of rows??
+
+Hint: Use grepl() on the INFO field to look for tell-tale tags.
+Hint: assume no overlap between exonic and intronic tags within a variant entry.
+```{r}
+intronic_variants <- grep("intron_variant", variants$INFO)
+intergenic_variants <- grep("intergenic_region", variants$INFO)
+
+length(intronic_variants)
+length(intergenic_variants)
+total_interon_and_intergenic_variants <- length(intronic_variants) + length(intergenic_variants)
+total_interon_and_intergenic_variants
+nrow(variants) #overall number of variants
+```
+*We know that a majority of the variants are of the intronic/intergenic category* (TA liked)
+
+Q5.8. List all the genes that have been affected by coding mutations and have high impact. What do you find that is interesting? 
+Hint: You can use SNPeff HIGH/MODERATE impact field to help you finding those genes.
+```{r}
+coding_mutations <- grep("protein_coding", variants$INFO)
+coding_mutations_and_high_impact <- grep("HIGH", variants$INFO[coding_mutations])
+
+info_coding <- as.character(variants$INFO[coding_mutations_and_high_impact])
+info_coding <- strsplit(info_coding, ";")
+
+#printing off the annotation 
+for (i in 1:length(info_coding)) {
+  print(info_coding[[i]][grep("^ANN=", info_coding[[i]])])
+}
+
+```
+*LIST OUT THE GENES WE PRINTED HEHE*
+
+Q5.9. (bonus): Using Strelka on our data, we can detect indels, but only to a limited extent. Most
+of the reads in our BAM file have read lengths around 60bp long. Why might this have
+consequences for the detection of insertions that are longer than 60bp?
+*bonus*
+```{r}
+
+```
+
+
+Q5.10. Variant Allele Frequency (VAF) is an important metric that helps us to measure how many
+DNA molecules in a given sample are carrying a given variant. It also helps to identify potential
+false-positive situations caused by incorrect base calls or alignment. VAF is calculated by
+The number of variant alleles /(The number of Variant alleles + The number of Reference alleles)
+
+In the form of a boxplot, plot the distribution of the VAFs across all the variants. How many
+variants have VAF > 5%? How many of those variants (the ones with >5% VAF) are in coding
+regions?
+Hint: You will need to parse the genotype encoding field (GT:GQ:GQX:DP:DPF...) to get allele
+counts and then get VAF. To understand that column, look at the VCF Variant Call Format
+Document (GATK) section 5. 
+
+More information on coding regions: https://en.wikipedia.org/wiki/Coding_regionLinks to an external site.
+Coding mutations can be found from the table below. source: https://pcingola.github.io/SnpEff/se_inputoutput/Links to an external site.  
+```{r}
+VAF <- c()
+
+for (i in 1:nrow(variants)) {
+  # split by : for format and ws20171223...
+  # unlist both of those
+  format_info <- unlist(strsplit(as.character(variants$FORMAT[i]), ":"))
+  ws_info <- unlist(strsplit(as.character(variants$ws20171223_MPs_tomatoMuscle8wkQuiescent201[i]), ":"))
+
+  # use the AD index to pull the pair from ws_info
+  AD_pair <- ws_info[grep("AD", format_info)[1]]
+  
+  # split the pair by ,
+  AD_split <- as.integer(unlist(strsplit(as.character(AD_pair), ",")))
+  
+  # then do the math x/(x+y) (this is a %)
+  # store it in VAF
+  VAF[i] <- AD_split[1] / (AD_split[1]+AD_split[2])
+}
+
+boxplot(VAF)
+
+VAF_greater5 <- which(VAF >= 0.05)
+length(VAF_greater5)
+
+length(VAF_greater5[grep("protein_coding", variants$INFO[VAF_greater5])])
+
+```
+
+initiate an empty VAF vector 
+
+mega super duper for loop:
+split by : for format and askhdfjkdhsf
+unlist both of those
+use the AD index to pull the pair from akdshfkjdsfh
+split the pair by ,
+then do the math x/(x+y) (this is a %)
+store it in VAF
+
+1 box plot for the 836 variants that describes the distribution 
+
+
+for >5% can use which probs?
+use grep for: "How many of those variants (the ones with >5% VAF) are in coding regions?"
