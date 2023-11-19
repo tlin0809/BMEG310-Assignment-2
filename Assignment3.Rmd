@@ -51,7 +51,7 @@ x_length
 
 # Q4. Looking at the Reads of an alignment (SAM) file
 
-Q4.1. How many reads are there in this BAM file?
+## Q4.1. How many reads are there in this BAM file?
 *There are 146,346 reads in this BAM file.*
 ```{r}
 #load the reads into an R dataframe. Each row contains one read.
@@ -86,9 +86,8 @@ print(length(Xchrom))
 #head(Xchrom)
 ```
 # Q4.4. What is the mean base quality (BQ) for reads aligning to chromosome X?
-*65.7 is the mean BQ for reads aligning to chrom X.*
+*32.7 is the mean BQ for reads aligning to chrom X.*
 ```{r}
-#HELPPP TA WHERE DO WE SUBTRACT 33 / DO WE NEED TO???- asked on piazza
 Xchrom <- sam[sam$V3 == "X", ]
 
 bq_int_x <- sapply(Xchrom$V11, utf8ToInt)-33
@@ -99,25 +98,23 @@ print(mean(bq_int_x))
 ## Q4.5. Plot the distribution of BQs across all bases and reads as a boxplot. 
 Comment on your observation. 
 Hint: This is similar to a boxplots that was provided in the lecture related to primary analysis. 
-*asdf*
+*We observe that there is a good per base sequence quality, throughout all the positions.*
+*This shows us that we likely do not need to trim any of the data*
 ```{r}
-#HELPPPPPPPPPPPP SOS TA!
 bq_int <- sapply(sam$V11, utf8ToInt)-33
 bq_int <- t(bq_int)
 
-dim(bq_int)
+#dim(bq_int)
 
-boxplot(bq_int[,1:10], at = 1:10, xlim = c(1,58), xaxt = 'n')
+#We got help on our code from the TA! (Tina) :)
+boxplot(bq_int[,1:10], at = 1:10, xlim = c(1,58), xaxt = 'n', main = "Distribution of Base Qualities", xlab = "Position in the read", ylab = "Base Quality")
 boxplot(bq_int[,11:20], at = 11:20, add = TRUE, xaxt = 'n')
 boxplot(bq_int[,21:30], at = 21:30, add = TRUE, xaxt = 'n')
 boxplot(bq_int[,31:40], at = 31:40, add = TRUE, xaxt = 'n')
 boxplot(bq_int[,41:50], at = 41:50, add = TRUE, xaxt = 'n')
 boxplot(bq_int[,51:58], at = 51:58, add = TRUE, xaxt = 'n')
 
-
 axis(1:58, at = 1:58)
-
-#titles later!!! 
 ```
 
 ## Q4.6. Referring to section 1.4 of the SAM/BAM documentation, what column contains the leftmost
@@ -141,7 +138,6 @@ the alignment step of processing our library data. It is reported as an integer 
 ## Q4.8. How many reads have mapping quality less than 50? 
 *61,527 reads.*
 ```{r}
-#*** CONFIRM ITS OUT OF THE WHOLE SAM FILE, NOT CHROMOSOME 9 - asked on piazza
 mapq_less_50 <- which(sam$V5 < 50)
 length(mapq_less_50)
 ```
@@ -189,25 +185,25 @@ header=TRUE, sep="\t")
 ```
 
 
-## Q5.1 For the first variant (row) in the dataframe, what is the reference allele base at the
-site, and what is the alternative allele called by Strelka?
+## Q5.1 For the first variant (row) in the dataframe, what is the reference allele base at the site, and what is the alternative allele called by Strelka?
 Hint: Take a look at the VCF Variant Call Format document in the appendix for details on each
 column name.
 *G and A*
 ```{r}
-#do traye's thing
+ref.allele <- variants$REF[1]
+alt.allele <- variants$ALT[1]
+
+cat("Reference Allele:", ref.allele, "\n")
+cat("Alternative Allele:", alt.allele)
 ```
 
-
 The INFO field is organised into variables by the form 'TAG=value' (see the VCF Variant Call Format document).
-## Q5.2.  Write code to obtain the entirety of the ANN info value contents from the INFO field for the first variant. 
+## Q5.2. Write code to obtain the entirety of the ANN info value contents from the INFO field for the first variant. 
 ```{r}
-#split the string with ANN=
-
-ANN_1 = unlist(strsplit(as.character(variants$INFO)[1], "ANN="))[2]
-# BUUUUT i  didnt use grep - use teams code 
-
-print(ANN_1)
+info_field <- as.character(variants$INFO[1])
+info_variables <- strsplit(info_field, ";")[[1]]
+ann_info <- info_variables[grep("ANN=", info_variables)]
+ann_info
 ```
 
 Q5.3. Each INFO tag-value pair is detailed in a line of the header, beginning with the tag '##INFO=
@@ -215,11 +211,10 @@ Q5.3. Each INFO tag-value pair is detailed in a line of the header, beginning wi
 format of the ANN value contents. This tag-value pair contains the results of the annotations
 found by snpEff. 
 Based on the ANN value of the first variant, what does the 'Annotation' field tell us about this variant?
+*The field tells us that this is an intronic variant.*
 ```{r}
 #need to split up the annotation with commas
-strsplit(as.character(ANN_1), ",")
-
-# SOS IS IT ENOUGH TO JUST SAY INTRONIC VARIANT
+strsplit(as.character(ann_info), ",")
 ```
 
 Hint: snpEff can return multiple annotation entries for the same variant because some variants
@@ -232,45 +227,46 @@ names and summaries of their effects.
 
 
 Q5.4. Perform the parsing done in Q5.1-3 again on variant line 683. What gene would this variant affect?
+*Rps19 gene. We can see it is this gene from the annotations printed below.* 
 ```{r}
 ANN_683 = unlist(strsplit(as.character(variants$INFO)[683], "ANN="))[2]
 strsplit(as.character(ANN_683), ",")
 ```
-*Rps19 gene. We can see it is this gene from the annotations printed above.* (TA said this was fine, non need to extract -> maya)
+
 
 Q5.5. Within the entire VCF file, how many HIGH impact variants we see in total? 
+*4 in total*
 ```{r}
 high_impacts <- grep("HIGH", variants$INFO)
 
 length(high_impacts)
-
 ```
 
 Q5.6. What is a frameshift variant? Does it have a greater or lesser effect on the resultant protein than a missense variant? Why? 
-*lol*
+*A frameshift variant is a type of mutation that involves the insertion or deletion of nucleotides that changes the reading frame of a DNA sequence. It often results in a premature STOP codon. A frameshift variant is more likely to have more severe consequences than the a missense variant. This is because a frameshift variant has the ability to affect the entire sequence downstream of the mutation, causing a shift in the entire amino sequence during protein translation. However, a missense variant involves the substitution of only one nucleotide, resulting in the change of a single amino acid in the protein sequence.*
 
 Q5.7. 
 We can divide variants into two broad categories: intronic/intergenic and exonic. 
 Count the number of potential intronic variants AND intergenic! 
 What do you notice about the number of intronic variants (compared to overall number of variants)?
--------> overall number aka the number of rows??
-
 Hint: Use grepl() on the INFO field to look for tell-tale tags.
 Hint: assume no overlap between exonic and intronic tags within a variant entry.
+
+*We observe that a majority of the variants are of the intronic/intergenic category.*
 ```{r}
 intronic_variants <- grep("intron_variant", variants$INFO)
 intergenic_variants <- grep("intergenic_region", variants$INFO)
 
-length(intronic_variants)
-length(intergenic_variants)
+cat("Number of intronic variants:", length(intronic_variants), "\n")
+cat("Number of intergenic variants:",length(intergenic_variants), "\n")
 total_interon_and_intergenic_variants <- length(intronic_variants) + length(intergenic_variants)
-total_interon_and_intergenic_variants
-nrow(variants) #overall number of variants
+cat("Total number of intronic/intergenic:",total_interon_and_intergenic_variants, "\n")
+cat("Total number of variants:", nrow(variants), "\n")
 ```
-*We know that a majority of the variants are of the intronic/intergenic category* (TA liked)
 
 Q5.8. List all the genes that have been affected by coding mutations and have high impact. What do you find that is interesting? 
 Hint: You can use SNPeff HIGH/MODERATE impact field to help you finding those genes.
+*As printed below, the genes affected are: Nufip2, Tmem45a, Rpl11, n-R5s193-Spsb1.*
 ```{r}
 coding_mutations <- grep("protein_coding", variants$INFO)
 coding_mutations_and_high_impact <- grep("HIGH", variants$INFO[coding_mutations])
@@ -282,18 +278,11 @@ info_coding <- strsplit(info_coding, ";")
 for (i in 1:length(info_coding)) {
   print(info_coding[[i]][grep("^ANN=", info_coding[[i]])])
 }
-
-```
-*LIST OUT THE GENES WE PRINTED HEHE*
-
-Q5.9. (bonus): Using Strelka on our data, we can detect indels, but only to a limited extent. Most
-of the reads in our BAM file have read lengths around 60bp long. Why might this have
-consequences for the detection of insertions that are longer than 60bp?
-*bonus*
-```{r}
-
 ```
 
+
+Q5.9. (bonus): Using Strelka on our data, we can detect indels, but only to a limited extent. Most of the reads in our BAM file have read lengths around 60bp long. Why might this have consequences for the detection of insertions that are longer than 60bp?
+*Due to the average read length being around 60bp long, it may be difficult to detect insertion longer than 60bp. This is because the variant caller may not have enough information to identify and characterize long insertions. Additionally, if the alignment algorithm relies on short reads it may be difficult to accurately align longer insertion to a reference genome.*
 
 Q5.10. Variant Allele Frequency (VAF) is an important metric that helps us to measure how many
 DNA molecules in a given sample are carrying a given variant. It also helps to identify potential
@@ -309,7 +298,11 @@ Document (GATK) section 5.
 
 More information on coding regions: https://en.wikipedia.org/wiki/Coding_regionLinks to an external site.
 Coding mutations can be found from the table below. source: https://pcingola.github.io/SnpEff/se_inputoutput/Links to an external site.  
+
+*How many variants have VAF > 5%? ----> 422 *
+*How many of those variants (the ones with >5% VAF) are in coding regions? ----> 377*
 ```{r}
+#Note, we got lots of help from the TA (Tina) :)
 VAF <- c()
 
 for (i in 1:nrow(variants)) {
@@ -329,27 +322,13 @@ for (i in 1:nrow(variants)) {
   VAF[i] <- AD_split[1] / (AD_split[1]+AD_split[2])
 }
 
-boxplot(VAF)
+boxplot(VAF, main = "Distribution of VAFs Across Variants", ylab = "VAF")
+
 
 VAF_greater5 <- which(VAF >= 0.05)
-length(VAF_greater5)
 
-length(VAF_greater5[grep("protein_coding", variants$INFO[VAF_greater5])])
+cat("How many variants have VAF > 5%?", length(VAF_greater5), "\n")
+
+cat("How many of those variants (the ones with >5% VAF) are in coding regions?",length(VAF_greater5[grep("protein_coding", variants$INFO[VAF_greater5])]))
 
 ```
-
-initiate an empty VAF vector 
-
-mega super duper for loop:
-split by : for format and askhdfjkdhsf
-unlist both of those
-use the AD index to pull the pair from akdshfkjdsfh
-split the pair by ,
-then do the math x/(x+y) (this is a %)
-store it in VAF
-
-1 box plot for the 836 variants that describes the distribution 
-
-
-for >5% can use which probs?
-use grep for: "How many of those variants (the ones with >5% VAF) are in coding regions?"
