@@ -63,6 +63,8 @@ library(pheatmap)
 The summary of the maf file can be visualized through a stacked barplot depicting the number of variants in each sample, alongside a boxplot summarizing variant types based on Variant_Classification, and so on.
 
 ```{r}
+library(ggplot2)
+
 #hugo symbol is gene names, "table" lets us summarize the content
 hugo <- as.data.frame(table(mutation_data$Hugo_Symbol))
 #output is one column of the gene name, and second column is frequency of each gene
@@ -70,7 +72,7 @@ hugo <- as.data.frame(table(mutation_data$Hugo_Symbol))
 
 #again, variant_classification is the outcome or consequence of the mutation 
 #output is the frequency of each mutation type
-var.class <- as.data.frame(table(mutation_data$Variant_Classification))
+var.class <- as.data.frame(table(mutation_data$Variant_Classification[1:100]))
 #thus we have 17 types of variant classification 
 #for eg, row 10 tells us how often we have a Missense Mutation (5259), meaning that the mutated codon changes the resulting amino acid
 
@@ -106,10 +108,10 @@ hugo <- as.data.frame(table(mutation_data$Hugo_Symbol))
 #code orders from highest to lowest frequency 
 hugo.ordered <- hugo[order(-hugo$Freq),]
 
-ggplot(data=hugo.ordered[1:15,], aes(x=Var1, y=Freq))+
+ggplot(data=hugo.ordered[1:20,], aes(x=Var1, y=Freq))+
   geom_col()+
   theme(axis.text.x = element_text(angle = 45,hjust=1))+
-  scale_x_discrete(limits = hugo.ordered[1:15,]$Var1)
+  scale_x_discrete(limits = hugo.ordered[1:20,]$Var1)
 #the 4th line is important! otherwise r will sort alphabetically instead of highest to lowest. 
 #we are saying to r: sort it based on the info i give you. not alphabetically 
 ```
@@ -195,6 +197,8 @@ rownames(oncomat) = oncomat$Hugo_Symbol
 oncomat <- oncomat[,-1]
 
 oncomat.ordered <- oncomat[order(-hugo$Freq),]
+#oncomat.ordered <- oncomat[order(-hugo$Freq),][1:20,] #only top 20 genes by freq
+
 ```
 lots of data, ploting would be a big mess
 so, its important for us to plot the highly mutated genes
@@ -203,12 +207,16 @@ based on the frequency of hugo, we are ordering the oncomat
 now, you can see that the first row is VHL, which was the highest mutated gene we found earlier 
 
 now going to convert it.
-all the mutations are important for us. that is the default idea
+tall the mutations are important for us. that is the default idea
 BUT FOR THE PROJECT MUST FIND A HYPOTHESIS FOR WHICH VAR CLASS IS IMPORTANT
 ```{r}
 mat <- oncomat.ordered
-mat[mat!=""]=1
-mat[mat==""]=0
+
+#Here we are building our matrix with ONLY Missense Mutations
+mat[mat!="Missense_Mutation"]=0 
+mat[mat=="Missense_Mutation"]=1
+mat[mat==""]=0 
+
 mat <- apply(mat, 2 ,as.numeric)
 mat <- as.matrix(mat)
 rownames(mat)  <-  row.names(oncomat.ordered)
@@ -226,7 +234,7 @@ Patients can be grouped into clusters based on their most prevalent mutated gene
 ```{r}
 library(pheatmap)
 
-reduce.mat <- mat[1:3,]
+reduce.mat <- mat[1:20,] #clustering based on top 20 most prevalent genes
 res <- pheatmap(reduce.mat,
          cluster_rows = F,
          show_colnames=FALSE)
@@ -246,3 +254,697 @@ now we want to do survival analysis. why?
 bcause grouping isnt enough. we need to clinically show that there is a difference between group 1 and group 2.
 IF there is a clinical difference, then it probably was a good discovery. 
 
+
+
+--------------------------------------------------------------------------------
+# DIFFERENTIAL EXPRESSION ANALYSIS
+
+WE ARE USING THE CLINICAL DATA SET FOR THISSSS
+our null hypothesis here is that i have control vs knockdown ...?
+an ALTERNATIVE hypothesis is that if age plus sex can discriminate our data set? yes or no. 
+
+
+# Differential expression analysis
+
+Learning objectives:
+
+- Perform expletory analysis on gene-level count matrix using PCA & Heatmap
+- Perform differential expression  in DESeq2
+- Perform gene annotation to add gene names
+- Perform pathway analysis which  provides functional annotation as well as information about gene products that interact with each other in a given pathway
+
+
+# 1- Background
+
+This tutorial shows an example of RNA-seq data analysis with DESeq2. Using data from GSE37704, with processed data available as attachment. This dataset has six samples from GSE37704.
+
+https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE37704
+
+# 2- Install and load libraries
+
+```{r}
+# BiocManager::install("DESeq2")
+# install.packages("pheatmap")
+# install.packages("ggplot2")
+# 
+# BiocManager::install("AnnotationDbi")
+# BiocManager::install("org.Hs.eg.db")
+# BiocManager::install("pathview")
+# BiocManager::install("gage")
+# BiocManager::install("gageData")
+
+```
+
+```{r include=FALSE}
+library(DESeq2)
+library(ggplot2)
+library(pheatmap)
+```
+
+# 3- Reading and preprocess data
+
+## 3.1- Import data
+
+First, import the countdata and metadata 
+
+
+```{r}
+#see code at top of script on how we cleaned the RNA data
+# Import metadata
+colData = clinical_data
+colData
+```
+
+
+```{r}
+#see code at top of script on how we cleaned the RNA data
+
+# import as dataframe
+countData <- RNA_data
+# convert dataframe to matrix
+#countData = as.matrix(countData) 
+```
+
+## 3.2- Preprocess data
+### ALWAYS keep in mind to preprocess the data!
+1. Here we see that column **length** is not a sample (Experiment), so we need to remove it
+```{r}
+#countData = countData[,-1] #delete the first column
+```
+
+2. Filter data where you only have 0 or 1 read count across all samples.
+->> BECAUSE if the expression is 0, we dont need to see them. 
+```{r}
+countData <- as.numeric(unlist(countData))
+countData <- countData[rowSums(countData)>1,]
+
+```
+
+Now, let see some top data
+
+-> columns are conditions
+-> rows are genes?
+
+```{r}
+head(countData)
+```
+now lets explore the data set before running DE
+
+
+# 4- Exploratory analysis and visualization
+
+## 4.1- Sample distances
+A useful first step in an RNA-seq analysis is often to assess overall similarity between samples: Which samples are similar to each other, which are different? Does this fit to the expectation from the experiment’s design?
+
+We use the R function dist to calculate the Euclidean distance between samples. 
+We need to transpose the matrix of values using **t**, because the **dist** function expects the different samples to be rows of its argument, and different dimensions (here, genes) to be columns.
+
+```{r}
+sampleDists = dist(t(countData),upper = TRUE)
+sampleDists
+```
+
+We visualize the distances in a *heatmap* in a figure below, using the function pheatmap from the **pheatmap** package.
+
+In order to plot the sample distance matrix with the rows/columns arranged by the distances in our distance matrix, we manually provide sampleDists to the clustering_distance argument of the pheatmap function. Otherwise the pheatmap function would assume that the matrix contains the data values themselves, and would calculate distances between the rows/columns of the distance matrix, which is not desired.
+
+whats happening here:
+converting the condtitions to a dataframme
+it should be a matrix for heat map 
+convert the sample distances to a matrix
+want it to be n x n, ie conditions x conditions 
+input for heat map should be a matrix
+we want to cluster the dist rows and cols 
+we dont want to show the clustering though, but do want to show the dendrogram for the ??? 
+we need the annotations for the region 
+```{r}
+annot_col = data.frame(colData$condition)
+row.names(annot_col) <- rownames(colData)
+
+sampleDistMatrix = as.matrix( sampleDists )
+rownames(sampleDistMatrix) = colnames(countData)
+colnames(sampleDistMatrix) = colnames(countData)
+
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         cluster_rows=FALSE, show_rownames=TRUE,
+         cluster_cols=TRUE,
+         annotation_col=annot_col)
+```
+we see that unsupervised macchine learning clustereed 2 conditions, red and blue/teal
+
+
+## 4.2- PCA plot
+
+Another way to visualize sample-to-sample distances is a principal components analysis (PCA). In this ordination method, the data points (here, the samples) are projected onto the 2D plane such that they spread out in the two directions that explain most of the differences (figure below). The x-axis is the direction that separates the data points the most. The values of the samples in this direction are written PC1. The y-axis is a direction (it must be orthogonal to the first direction) that separates the data the second most.
+
+use prcomp
+transpose it
+not a bad idea to scale it 
+get the x values, convert to data frame, and then plot 
+```{r}
+pca_res <- prcomp(t(countData), scale. = TRUE)
+score <- pca_res$x
+
+score = as.data.frame(score)
+score$color <- as.factor(colData$condition)
+
+
+ggplot(score, aes(x=PC1, y=PC2,  color=color)) + 
+  geom_point(size = 4)
+
+```
+visualizing shows they are far apart. so unsupervised ML makes sense
+
+
+```{r}
+colnames(countData)
+```
+```{r}
+library("gridExtra")
+```
+
+2 data sets, 2 plots
+trying to plot this histogram 
+try to transform everthing to a log base form 
+use grid.arrange to see everything 
+```{r}
+p1 <- ggplot(as.data.frame(countData),aes(x=SRR493370))+
+  geom_histogram(bins=50)+
+  labs(title="No transformation")
+
+log2 <- log(countData+1, base = 2)
+p2 <- ggplot(as.data.frame(log2),aes(x=SRR493370))+
+  geom_histogram(bins=50)+
+  labs(title="Log(x+1)")
+
+grid.arrange(p1, p2, ncol = 2) 
+```
+we see if we normalized them, we see a better discrimination 
+so if we run our gene expression data sets without normalization... clustering wont make sense
+
+
+now... here is important... 
+
+# 5- Set up the DESeqDataSet Object and run the DESeq pipeline
+Differential expression analysis with DESeq2 involves multiple steps as displayed in the flowchart below. Briefly,
+
+- DESeq2 will model the raw counts, using normalization factors (size factors) to account for differences in library depth.
+- Then, it will estimate the gene-wise dispersions and shrink these estimates to generate more accurate estimates of dispersion to model the counts.
+- Finally, DESeq2 will fit the negative binomial model and perform hypothesis testing using the Wald test or Likelihood Ratio Test.
+
+![img](https://angus.readthedocs.io/en/2019/_static/DESeq2_workflow.png)
+
+design is the relation we are interested in. eg based on literature, maybe we are looking at sex and age
+then the hypothesis is that sex+age are our parameters
+so always use tilda ~ for a formula 
+eg we could have done  design=~sex+age 
+but today we are interested in "condition" 
+
+
+We’re now ready to use `DESeq2`, the package that will perform differential expression.
+```{r}
+dds = DESeqDataSetFromMatrix(countData=countData,
+                              colData=colData,
+                              design=~condition)
+
+# this error is expected: some variables in design formula are characters, converting to factors
+```
+
+## Running the differential expression pipeline
+
+trying to fit a negative binomial 
+fitting the model and testing, etc
+all the DESeq operation happened here. easy!
+hardest part is how to interpret the result 
+```{r}
+dds = DESeq(dds)
+dds
+```
+
+This function will print out a message for the various steps it performs. These are described in more detail in the manual page for DESeq, which can be accessed by typing ?DESeq. Briefly these are: the estimation of size factors (controlling for differences in the sequencing depth of the samples), the estimation of dispersion values for each gene, and fitting a generalized linear model.
+
+now we want to build the results 
+
+## Building the results table
+Calling results without any arguments will extract the estimated log2 fold changes and p values for the last variable in the design formula. If there are more than 2 levels for this variable, results will extract the results table for a comparison of the last level over the first level. 
+
+
+BASE MEAN is the average value for of its normalized expression
+LOG2FOLD CHANGE ... we love knowing the doubling rate in biology. so if the gene is upregulated, it is >1 here. if <-1, its down reguatled. if between -1 and 1, we dont care, its insignificant 
+
+sometimes
+
+lfcSE = log fold change standard error
+
+pvalue for EACH gene. is the gene significant or not? if less than .05 it is significant, otherwise its not. 
+but remember, we dont want to only trust p-value. can have compounding error
+
+padj = adjusted p value
+
+```{r}
+res <- results(dds)
+res
+```
+
+We could have equivalently produced this results table with the following more specific command.
+
+in designing experiements, when u do this multiple comparision, the software also has its own global mean. we do not want to do DE on our global mean.
+call it "condition" here to tell the software this is my intercept... 
+second is hoxa1
+everything is divided by control_sirna 
+ie the last one is our control
+
+condition here is where youd replace it with sex+age
+see online for how to account for having 2
+
+
+```{r}
+res = results(dds, contrast=c("condition", "hoxa1_kd", "control_sirna"))
+
+```
+
+As res is a DataFrame object, it carries metadata with information on the meaning of the columns:
+
+here its showing the definitions. basemean is the mean of normalized count, etc... 
+```{r}
+mcols(res, use.names = TRUE)
+```
+
+for our information:
+| baseMean       | giving means across all samples                              |
+| :------------- | :----------------------------------------------------------- |
+| log2FoldChange | log2 fold changes of gene expression from one condition to another. Reflects how different the expression of a gene in one condition is from the expression of the same gene in another condition. |
+| lfcSE          | standard errors (used to calculate p value)                  |
+| stat           | test statistics used to calculate p value)                   |
+| pvalue         | p-values for the log fold change                             |
+| padj           | adjusted p-values                                            |
+
+* The first column, **baseMean**, is a just the average of the normalized count values, divided by the size factors, taken over all samples in the *DESeqDataSet*. The remaining four columns refer to a specific contrast
+
+* The column log2FoldChange is the effect size estimate. It tells us how much the gene’s expression seems to have changed due to treatment with dexamethasone in comparison to untreated samples. This value is reported on a logarithmic scale to base 2: for example, a log2 fold change of 1.5 means that the gene’s expression is increased by a multiplicative factor of 21.5≈2.82.
+
+factor of 2 to the power of 1.5 
+
+Of course, this estimate has an uncertainty associated with it, which is available in the column **lfcSE**, the standard error estimate for the log2 fold change estimate. We can also express the uncertainty of a particular effect size estimate as the result of a statistical test. The purpose of a test for differential expression is to test whether the data provides sufficient evidence to conclude that this value is really different from zero. DESeq2 performs for each gene a hypothesis test to see whether evidence is sufficient to decide against the null hypothesis that there is zero effect of the treatment on the gene and that the observed difference between treatment and control was merely caused by experimental variability (i.e., the type of variability that you can expect between different samples in the same treatment group). As usual in statistics, the result of this test is reported as a p value, and it is found in the column **pvalue**. Remember that a p value indicates the probability that a fold change as strong as the observed one, or even stronger, would be seen under the situation described by the null hypothesis.
+
+for eg. say u have 15,000 genes. then you have 750 genes are false positive if using pvalue of 0.05
+but, lets assume that 5,000 genes are important and we care about them, ie they are upregulated or downregulated, significant for us. so would we really be happy if 750 genes were wrong? 750/5000 means 15 percent false discovery which is HUGE!
+say instead of 15% we want to set that to 10%. that is based on adjusted value. 
+so now we can play with adjusted pvalue and with false discovery rate 
+
+
+We can also summarize the results with the following line of code, which reports some additional information, that will be covered in later sections.
+
+as a practitioner, we dont want to know the formulation, but we have to interpret the result
+here its telling us we have 15,280 genes in total
+the adjust p valu eis 10%
+28% of the genes upregulated, 29% down
+no outliers 
+590 are low count, which we dont care about them 
+
+if you sum 4k4k+590, you get less than 15,280. why? where is the 5k? those are the insignificant ones!
+remember we looked at <-1 and >1 
+
+```{r}
+summary(res)
+```
+
+Note that there are many genes with differential expression due to  treatment at the FDR level of 10%.
+
+However, there are two ways to be more strict about which set of genes are considered significant:
+
+* lower the false discovery rate threshold (the threshold on padj in the results table)
+* raise the log2 fold change threshold from 0 using the lfcThreshold argument of results
+
+
+If we lower the false discovery rate threshold, we should also inform the results() function about it, so that the function can use this threshold for the optimal independent filtering that it performs:
+
+now we can talk about the sweetest part, pvalue
+alpha is the global p-value 
+if we run it with 0.05, we get 5910 false ie not significant 
+but if we play with the alpha and padj, we will get a different result 
+
+eg if alpha is 0.1 we get 6541 false
+can tell our algo to be more conservative or not 
+
+as a recommendation, keep alpha at 0.05, and play with padj instead 
+
+not that this does not affect our DESeq calucaltion, bc thats already done
+```{r}
+res.05 <- results(dds, alpha = 0.05)
+table(res.05$padj < 0.05)
+```
+
+Sometimes a subset of the *p* values in `res` will be `NA` (“not available”). This is *DESeq*'s way of reporting that all counts for this gene were zero, and hence not test was applied. In addition, *p* values can be assigned `NA` if the gene was excluded from analysis because it contained an extreme count outlier. 
+
+If we want to raise the log2 fold change threshold, so that we test for genes that show more substantial changes due to treatment, we simply supply a value on the log2 scale. For example, by specifying lfcThreshold = 1, we test for genes that show significant effects of treatment on gene counts more than doubling or less than halving, because 2^1=2.
+
+```{r}
+resLFC1 <- results(dds, lfcThreshold=1)
+table(resLFC1$padj < 0.1)
+```
+
+## p-values and adjusted p-values
+
+here we can sort the genes. will get the same result in summary, but will be tabulated in order 
+
+We can order our results table by the smallest p value:
+```{r}
+res <- res[order(res$pvalue),]
+summary(res)
+```
+QUESTION: How many adjusted p-values were less than 0.1?
+ie the sum of all of those in the table but for 10%?? 
+```{r}
+sum(res$padj < 0.1, na.rm=TRUE)
+```
+
+## Multiple testing
+
+Novices in high-throughput biology often assume that thresholding these *p* values at a low value, say 0.05, as is often done in other settings, would be appropriate – but it is not. We briefly explain why:
+
+There are 8594 genes with a *p* value below 0.05 among the 15280 genes, for which the test succeeded in reporting a *p* value:
+
+```{r}
+sum(res$pvalue < 0.05, na.rm=TRUE)
+```
+
+```{r}
+sum(!is.na(res$pvalue))
+```
+
+Now, assume for a moment that the null hypothesis is true for all genes, i.e., no gene is affected by the treatment with dexamethasone. Then, by the definition of *p* value, we expect up to 5% of the genes to have a *p* value below 0.05. This amounts to 764 genes. If we just considered the list of genes with a *p* value below 0.05 as differentially expressed, this list should therefore be expected to contain up to 764 / 8594 = 8.8% false positives.
+
+*DESeq2* uses the Benjamini-Hochberg (BH) adjustment as described in the base R *p.adjust* function; in brief, this method calculates for each gene an adjusted *p* value which answers the following question: if one called significant all genes with a *p* value less than or equal to this gene's *p* value threshold, what would be the fraction of false positives (the *false discovery rate*, FDR) among them (in the sense of the calculation outlined above)? These values, called the BH-adjusted *p* values, are given in the column `padj` of the `res` object.
+
+Hence, if we consider a fraction of 6% false positives acceptable, we can consider all genes with an adjusted *p* value below 6% = 0.06 as significant. How many such genes are there?
+
+```{r}
+sum(res$padj < 0.06, na.rm=TRUE)
+```
+
+We subset the results table to these genes and then sort it by the log2 fold change estimate to get the significant genes with the strongest down-regulation.
+
+can use subset to extract ur dataset 
+using 'order' can get the upregulated and downregulated genes 
+```{r}
+resSig <- subset(res, padj < 0.06)
+head(resSig[ order( resSig$log2FoldChange ), ])
+```
+
+…and with the strongest upregulation. The *order* function gives the indices in increasing order, so a simple way to ask for decreasing order you can use the argument `decreasing=TRUE`.
+```{r}
+head(resSig[ order( resSig$log2FoldChange, decreasing=TRUE), ])
+```
+
+## MA-plot
+In DESeq2, the function plotMA shows the log2 fold changes attributable to a given variable over the mean of normalized counts for all the samples in the DESeqDataSet. Points will be colored red if the adjusted p value is less than 0.1. Points which fall out of the window are plotted as open triangles pointing either up or down.
+
+```{r}
+plotMA(res, ylim=c(-2,2))
+```
+
+## Plot counts
+It can also be useful to examine the counts of reads for a single gene across the groups. A simple function for making this plot is plotCounts, which normalizes counts by sequencing depth and adds a pseudocount of 1/2 to allow for log scale plotting. The counts are grouped by the variables in intgroup, where more than one variable can be specified. Here we specify the gene which had the smallest p value from the results table created above. You can select the gene to plot by rowname or by numeric index.
+
+AKA WHICH GENE IS THE MOST SIGNIFICANT
+we only care about the two columns: padj and the log fold change 
+```{r}
+plotCounts(dds, gene=which.min(res$padj), intgroup="condition")
+```
+
+## Effects of transformations on the variance
+```{r}
+# this gives log2(n + 1)
+ntd <- normTransform(dds)
+# Variance stabilizing transformation
+vsd <- vst(dds)
+
+# Regularized log transformation
+# The blind=TRUE argument results in a transformation unbiased to sample condition information.
+rld <- rlog(dds, blind=FALSE)
+```
+
+```{r}
+sampleDists = dist(t(assay(rld)),upper = TRUE)
+
+annot_col = data.frame(colData$condition)
+row.names(annot_col) <- rownames(colData)
+
+sampleDistMatrix = as.matrix( sampleDists )
+rownames(sampleDistMatrix) = colnames(countData)
+colnames(sampleDistMatrix) = colnames(countData)
+
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         cluster_rows=FALSE, show_rownames=TRUE,
+         cluster_cols=TRUE,
+         annotation_col=annot_col)
+```
+
+```{r}
+pca_res <- prcomp(t(assay(vsd)), scale. = TRUE)
+score <- pca_res$x
+
+score = as.data.frame(score)
+score$color <- as.factor(colData$condition)
+
+
+ggplot(score, aes(x=PC1, y=PC2,  color=color)) + 
+  geom_point(size = 4)
+
+```
+
+
+
+```{r}
+# we can select a subset of genes to plot.let’s choose the 20 genes with the largest positive log2fold change.
+# genes <- order(res$log2FoldChange,decreasing = TRUE)[1:20]
+
+# or largest negative log2fold change
+# genes <- order(res$log2FoldChange, decreasing = FALSE)[1:20]
+
+# or we can select the top 20 significant genes
+genes <- order(res$padj,decreasing = TRUE)[1:20]
+```
+
+```{r}
+annot_col = data.frame(colData$condition)
+row.names(annot_col) <- rownames(colData)
+
+sampleMatrix <- assay(vsd)[genes,]
+
+rownames(sampleMatrix) = rownames(countData[genes,])
+colnames(sampleMatrix) = colnames(countData)
+
+pheatmap(sampleMatrix , cluster_rows=FALSE, show_rownames=TRUE,
+         cluster_cols=TRUE, annotation_col=annot_col)
+```
+
+
+
+
+# 6- Adding gene annotation
+
+Since we mapped and counted against the Ensembl annotation, our results only have information about Ensembl gene IDs. However, our pathway analysis downstream will use KEGG pathways, and genes in KEGG pathways are annotated with Entrez gene IDs.
+
+```{r}
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+
+columns(org.Hs.eg.db)
+```
+
+```{r}
+res$symbol = mapIds(org.Hs.eg.db,
+                    keys=row.names(res), 
+                    column="SYMBOL",
+                    keytype="ENSEMBL",
+                    multiVals="first")
+
+res$entrez = mapIds(org.Hs.eg.db,
+                    keys=row.names(res), 
+                    column="ENTREZID",
+                    keytype="ENSEMBL",
+                    multiVals="first")
+
+res$name =   mapIds(org.Hs.eg.db,
+                    keys=row.names(res), 
+                    column="GENENAME",
+                    keytype="ENSEMBL",
+                    multiVals="first")
+
+head(res, 10)
+```
+
+Great, this is looking good so far. Now lets see how pathway analysis can help us make further sense out of this ranked list of differentially expressed genes.
+
+# 7-Pathway Analysis
+
+Here we are going to use the [**gage**](https://bioconductor.org/packages/release/bioc/html/gage.html) package for pathway analysis. Once we have a list of enriched pathways, we’re going to use the [**pathview**](http://bioconductor.org/packages/release/bioc/html/pathview.html) package to draw pathway diagrams, shading the molecules in the pathway by their degree of up/down-regulation.
+
+## KEGG pathways
+
+The **gageData** package has pre-compiled databases mapping genes to KEGG pathways and GO terms for common organisms. `kegg.sets.hs` is a named list of 229 elements. Each element is a character vector of member gene Entrez IDs for a single KEGG pathway. (See also `go.sets.hs`). The `sigmet.idx.hs` is an index of numbers of signaling and metabolic pathways in `kegg.set.gs`. In other words, KEGG pathway include other types of pathway definitions, like “Global Map” and “Human Diseases”, which may be undesirable in a particular pathway analysis. Therefore, `kegg.sets.hs[sigmet.idx.hs]` gives you the “cleaner” gene sets of signaling and metabolic pathways only.
+
+> **Side-Note**: While there are many freely available tools to do pathway analysis, and some like gage are truly fantastic, many of them are poorly maintained or rarely updated. 
+
+Now we can load the packages and setup the KEGG data-sets we need.
+
+```{r}
+library(pathview)
+```
+
+```{r}
+library(gage)
+library(gageData)
+
+data(kegg.sets.hs)
+data(sigmet.idx.hs)
+
+# Focus on signaling and metabolic pathways only
+kegg.sets.hs = kegg.sets.hs[sigmet.idx.hs]
+
+# Examine the first 3 pathways
+head(kegg.sets.hs, 3)
+```
+
+The main **gage()** function requires a named vector of fold changes, where the names of the values are the Entrez gene IDs.
+
+Note that we used the **mapIDs()** function above to obtain Entrez gene IDs (stored in `res$entrez`) and we have the fold change results from DESeq2 analysis (stored in `res$log2FoldChange`).
+
+```{r}
+foldchanges = res$log2FoldChange
+names(foldchanges) = res$entrez
+head(foldchanges)
+```
+
+Now, let’s run the **gage** pathway analysis.
+
+```{r}
+# Get the results
+keggres = gage(foldchanges, gsets=kegg.sets.hs)
+```
+
+See help on the gage function with `?gage`. Specifically, you might want to try changing the value of `same.dir`. This value determines whether to test for changes in a gene set toward a single direction (all genes up or down regulated) or changes towards both directions simultaneously (i.e. any genes in the pathway dysregulated). Here, we’re using the default `same.dir=TRUE`, which will give us separate lists for pathways that are upregulated versus pathways that are down-regulated.
+
+Now lets look at the object returned from **gage()**.
+
+```{r}
+attributes(keggres)
+```
+
+It is a list with three elements, “greater”, “less” and “stats”.
+
+You can also see this in your *Environmnet* panel/tab window of RStudio or use the R command `str(keggres)`.
+
+Like any list we can use the dollar syntax to access a named element, e.g. `head(keggres$greater)` and `head(keggres$less)`.
+
+Lets look at the first few down (less) pathway results:
+
+```{r}
+# Look at the first few down (less) pathways
+head(keggres$less)
+```
+
+Each `keggres$less` and `keggres$greater` object is data matrix with gene sets as rows sorted by p-value.
+
+The top “less/down” pathways is “Cell cycle” with the KEGG pathway identifier `hsa04110`.
+
+Now, let’s try out the **pathview()** function from the [pathview package](https://bioconductor.org/packages/release/bioc/html/pathview.html) to make a pathway plot with our RNA-Seq expression results shown in color.
+To begin with lets manually supply a `pathway.id` (namely the first part of the `"hsa04110 Cell cycle"`) that we could see from the print out above.
+
+```{r}
+pathview(gene.data=foldchanges, pathway.id="hsa04110")
+```
+
+This downloads the pathway figure data from KEGG and adds our results to it. 
+
+Now, let’s process our results a bit more to automagicaly pull out the top 5 upregulated pathways, then further process that just to get the pathway IDs needed by the **pathview()** function. We’ll use these KEGG pathway IDs for pathview plotting below.
+
+```{r}
+## Focus on top 5 upregulated pathways here for demo purposes only
+keggrespathways <- rownames(keggres$greater)[1:5]
+
+# Extract the 8 character long IDs part of each string
+keggresids = substr(keggrespathways, start=1, stop=8)
+keggresids
+```
+
+inally, lets pass these IDs in `keggresids` to the **pathview()** function to draw plots for all the top 5 pathways.
+
+```{r}
+# pathview(gene.data=foldchanges, pathway.id=keggresids, species="hsa")
+```
+
+
+# Self-test
+
+1. If we assume p-value of 3%, what would be the expected false positive?
+
+2. If you substract ONE percent from % false positive calculated from (1), how many genes are there?
+
+3. Having results from 1 & 2, list the top 5 upregulated and top 5 downregulated **genes**?
+
+4. Same as to heatmep covered in this tutorial, plot heatmap of the found genes in part (3)
+
+   > Hint 1: In order to test for differential expression, we operate on raw counts. However for other downstream analyses – e.g. for visualization or clustering – it might be useful to work with transformed versions of the count data. Maybe the most obvious choice of transformation is the logarithm. Two alternative approaches that offer more theoretical justification: One makes use of the concept of variance stabilizing transformations (VST) (Tibshirani 1988; Huber et al. 2003; Anders and Huber 2010), and the other is the regularized logarithm or rlog, which incorporates a prior on the sample differences (Love, Huber, and Anders 2014). Both transformations produce transformed data on the log2 scale which has been normalized with respect to library size or other normalization factors.
+   >
+   > ```R
+   > vsd <- vst(dds, blind=FALSE)
+   > rld <- rlog(dds, blind=FALSE)
+   > head(assay(vsd),5)
+   > ```
+   >
+   > Hint 2: Gene names should be annotated names. The Heatmap should have `annotation_col`. Rows should be the names of genes and columns should be sample names
+
+5. Print the names of 1 most upregulated and 1 most downregulated pathways?
+
+## FAQ:
+
+1. Hi, I'm just having trouble interpreting this results table: 
+
+   <img src="https://piazza.com/redirect/s3?bucket=uploads&prefix=paste%2Fjlqzr1jdRdCb%2F51116bfef630158142713b105633d19a35a20dbfc677f5c092e7ea1d7e32a1e5%2Fimage.png" alt="image.png" style="zoom: 50%;" />
+   Why does summing these values also not give us the total number of genes (14095 instead of 15280)?
+   Also why does the TRUE value here differ from the result generated by sum(res$pvalue < 0.05, na.rm=TRUE)?
+
+   **Answer**: Let's run the following code
+
+   ```
+   res.05 <- results(dds, alpha = 0.05)
+   table(res.05$padj < 0.05)
+   summary(res.05)
+   ```
+
+   <img src="https://piazza.com/redirect/s3?bucket=uploads&prefix=paste%2Fkdn7157j8ykyx%2Ffe4f21fb6bef10659f40db48cb676ea51e46aca86bb4095f72131fbc51eecf72%2Fimage.png" alt="image.png" style="zoom:50%;" />
+
+   
+
+   1- 15280 is the number of all genes with nonzero total read count
+
+   2- The TRUE value which is 8185 equals the sum of LFC > 0 (up) and LFC < 0 (down) : =4043+ 4142 = 8185
+
+   3- if you sum the percentage of data (LFC > 0 (up) and LFC < 0 (down) ) is 26%+ 27% =53% plus 7.8% which is low counts
+   
+   4- the remaining is 39.2%. this remaining percent is the percentage FALSE value (5910 genes)
+
+   SO, FALSE(5910) + TRUE(8185) + low counts(1185) = 15280
+
+2.   What does low counts means in this case?
+
+   **Answer**: let’s type
+
+   `metadata(res)$filterThreshold` like
+
+   <img src="https://piazza.com/redirect/s3?bucket=uploads&prefix=paste%2Fkdn7157j8ykyx%2F9bbe7512275a2d821bfef04c7c29dee794a878e7733e98ddc779711cad48fb47%2Fimage.png" alt="image.png" style="zoom:50%;" />
+
+   these numbers mean is that DESeq2 has filtered out genes with a mean count of 0.5110906
+
+   877551% of genes were filtered out of the analysis including genes with all 0s
+
+3. Does the heatmap need to include the same annotation column as the example heatmap in the tutorial? Like the distinction between "control.sirna" and "hoxa1_kd"?
+
+   **Answer**: Yes
