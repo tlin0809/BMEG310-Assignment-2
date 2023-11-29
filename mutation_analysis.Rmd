@@ -29,6 +29,8 @@ library(stringr)
 #clinical data set
 length(unique(clinical_data$PATIENT_ID))
 
+#clinical_data <- clinical_data[,unique(clinical_data$PATIENT_ID)]
+
 
 #mutation data set
 mutation_data <- mutation_data %>% 
@@ -49,6 +51,20 @@ length(unique(colnames(RNA_data)))
 
 # RNA_seq_patients <- RNA_seq_patients %>% 
 #   mutate(RNA_seq_patients = str_remove(RNA_seq_patients, "-01"))
+
+
+test_clin <- subset(clinical_data, PATIENT_ID %in% mutation_data$Tumor_Sample_Barcode)
+
+# test_transpose <- t(RNA_data)
+#test2 <- subset(RNA_data %in% mutation_data$Tumor_Sample_Barcode)
+
+
+
+# Step 1: Identify common patient IDs OF THE UNQIUE ONES 
+test_mut <- intersect(mutation_data$Tumor_Sample_Barcode, colnames(RNA_data))
+
+# Step 2: Extract subset of RNA_data
+test_RNA <- RNA_data[, common_patient_ids]
 ```
 
 
@@ -139,10 +155,16 @@ library(pheatmap)
 
 cnv_events = unique(mutation_data$Variant_Classification)
 
+twokeygenes <- mutation_data[which(mutation_data$Hugo_Symbol == 'BAP1' | mutation_data$Hugo_Symbol == 'PBRM1'),]
+
+
 #dcast lets us reshape our data 
 #because we have a longggg data set of rows 
 oncomat = reshape2::dcast(
-  data = mutation_data,
+    data = twokeygenes, #nov 28
+    #data = mutation_data[which(mutation_data$Hugo_Symbol == 'BAP1' | mutation_data$Hugo_Symbol == 'PBRM1'),], #nov 28
+
+    #data = mutation_data,
   
   #ie rows are hugo symbols, col are patients 
   formula = Hugo_Symbol ~ Tumor_Sample_Barcode, 
@@ -196,6 +218,8 @@ why do we need to do this? because input for clustering is numeric. must convert
 rownames(oncomat) = oncomat$Hugo_Symbol
 oncomat <- oncomat[,-1]
 
+hugo <- as.data.frame(table(twokeygenes$Hugo_Symbol))
+
 oncomat.ordered <- oncomat[order(-hugo$Freq),]
 #oncomat.ordered <- oncomat[order(-hugo$Freq),][1:20,] #only top 20 genes by freq
 
@@ -213,9 +237,11 @@ BUT FOR THE PROJECT MUST FIND A HYPOTHESIS FOR WHICH VAR CLASS IS IMPORTANT
 mat <- oncomat.ordered
 
 #Here we are building our matrix with ONLY Missense Mutations
-mat[mat!="Missense_Mutation"]=0 
-mat[mat=="Missense_Mutation"]=1
-mat[mat==""]=0 
+# mat[mat!="Missense_Mutation"]=0
+# mat[mat=="Missense_Mutation"]=1
+# mat[mat==""]=0
+mat[mat!=""]=1
+mat[mat==""]=0
 
 mat <- apply(mat, 2 ,as.numeric)
 mat <- as.matrix(mat)
@@ -234,7 +260,8 @@ Patients can be grouped into clusters based on their most prevalent mutated gene
 ```{r}
 library(pheatmap)
 
-reduce.mat <- mat[1:20,] #clustering based on top 20 most prevalent genes
+reduce.mat <- mat #clustering based on top 20 most prevalent genes
+# reduce.mat <- mat[1:20,] #clustering based on top 20 most prevalent genes
 res <- pheatmap(reduce.mat,
          cluster_rows = F,
          show_colnames=FALSE)
@@ -242,17 +269,79 @@ res <- pheatmap(reduce.mat,
 the rows are the top 3 mutated 
 the columns are the patients 
 so, based on the first layer we have 2 groups
+based on the 2nd layer we have 3 groups 
 
 get the cluster value
 ```{r}
-cluster <-  as.data.frame(cutree(res$tree_col, k = 2))
+cluster <-  as.data.frame(cutree(res$tree_col, k = 3)) #JUST TWO GROUPS FOR NOW
 #ie want to group people into 2 groups
 cluster
+table(cluster) #this is how we know how much people are in each group
+
+#BUUTTTTTTTTTTTTTTTT not enough people to do survival analysis on
+#thus we decided to do survival analysis on 2 groups of patients: those with variants or BAP1 and/or PBRM1 compared to those without either BAP1 or PBRM1 variants.  
 ```
 
 now we want to do survival analysis. why? 
 bcause grouping isnt enough. we need to clinically show that there is a difference between group 1 and group 2.
 IF there is a clinical difference, then it probably was a good discovery. 
+
+
+<!-- # ```{r} -->
+<!-- # countmatrix_2genes <-  -->
+<!-- # ``` -->
+
+```{r}
+# hclust_matrix <- mutation_data %>% 
+#   select(-Hugo_Symbol) %>% 
+#   as.matrix()
+# 
+# rownames(hclust_matrix) <- mutation_data$Hugo_Symbol
+# 
+# #subset of our 2 key genes 
+# hclust_matrix <- hclust_matrix[which(mutation_data$Hugo_Symbol == 'BAP1' | mutation_data$Hugo_Symbol == 'PBRM1'),]
+# ```
+# 
+# ```{r}
+# #scale the data
+# hclust_matrix <- hclust_matrix %>% 
+#   t() %>% 
+#   scale() %>% 
+#   t()
+# 
+# gene_dist <- dist(hclust_matrix)
+```
+<!-- heirachial clusterng -->
+
+<!-- ```{r} -->
+<!-- genes_norm <- scale(as.numutation_data) -->
+<!-- ``` -->
+
+---------------------------------------------
+SO NOW LETS DO SURVIVAL ANALYSIS
+
+```{r}
+#BiocManager::install("TCGAbiolinks")
+#BiocManager::install("survival")
+#BiocManager::install("survminer")
+library("TCGAbiolinks")
+library("survival")
+library("survminer")
+
+library("SummarizedExperiment")
+
+```
+
+```{r}
+#First load the data:
+
+tcga_data <- twokeygenes
+colnames(colData(tcga_data))
+```
+```{r}
+table(tcga_data@colData$vital_status)
+
+```
 
 
 
