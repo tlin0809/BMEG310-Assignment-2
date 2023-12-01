@@ -335,15 +335,57 @@ library("SummarizedExperiment")
 ```{r}
 #First load the data:
 
-tcga_data <- twokeygenes
-colnames(colData(tcga_data))
+tcga_data <- as.data.frame(mutation_data)
+
+nottwokeygenes <- mutation_data[which(mutation_data$Hugo_Symbol != 'BAP1' & mutation_data$Hugo_Symbol != 'PBRM1'),]
+
+#idk <- intersect(clinical_data$PATIENT_ID, twokeygenes$Tumor_Sample_Barcode)
+
+
+#colnames(colData(tcga_data))
 ```
+
 ```{r}
 table(tcga_data@colData$vital_status)
 
 ```
 
+daystodeath and daystolastfollowup will be combined for time 
+```{r}
+# we are only interested in the "Primary solid Tumor" cases for survival
+clin_df = clinical_data[,
+                    c("PATIENT_ID",
+                      "OS_STATUS",
+                      "DSS_MONTHS", #disease specific survival #CONFIRM WITH TA!!!!!!!!
+                      "DAYS_LAST_FOLLOWUP"
+                      )]
+clin_df$MONTHS_LAST_FOLLOWUP <- clin_df$DAYS_LAST_FOLLOWUP/30.417 #month to day conversion
 
+clin_df$deceased = clin_df$OS_STATUS == "1:DECEASED"
+
+# create an "overall survival" variable that is equal to days_to_death
+# for dead patients, and to days_to_last_follow_up for patients who
+# are still alive
+clin_df$overall_survival = ifelse(clin_df$deceased,
+                                   clin_df$DSS_MONTHS,
+                                  clin_df$MONTHS_LAST_FOLLOWUP)
+
+clin_df$haskeygene <- 0 #initializing
+
+if(clin_df$PATIENT_ID == unique(twokeygenes$Tumor_Sample_Barcode)){
+  clin_df$haskeygene = 1
+}
+
+# show first 10 samples
+head(clin_df)
+```
+```{r}
+# fit a survival model
+#ie fit that model! 
+fit = survfit(Surv(overall_survival, deceased) ~ gender, data=clin_df)
+
+print(fit)
+```
 
 --------------------------------------------------------------------------------
 # DIFFERENTIAL EXPRESSION ANALYSIS
