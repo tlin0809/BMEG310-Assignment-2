@@ -27,7 +27,7 @@ library(dplyr)
 library(stringr)
 
 #clinical data set
-length(unique(clinical_data$PATIENT_ID))
+patient_id <- unique(clinical_data$PATIENT_ID)
 
 #clinical_data <- clinical_data[,unique(clinical_data$PATIENT_ID)]
 
@@ -36,7 +36,7 @@ length(unique(clinical_data$PATIENT_ID))
 mutation_data <- mutation_data %>% 
   mutate(Tumor_Sample_Barcode = str_remove(Tumor_Sample_Barcode, "-01"))
 
-length(unique(mutation_data$Tumor_Sample_Barcode))
+mutations_id <- unique(mutation_data$Tumor_Sample_Barcode)
 
 
 #Change the dots to dashes for the col names in RNAseq
@@ -47,13 +47,13 @@ names(RNA_data) <- gsub(x = names(RNA_data), pattern = "\\.", replacement = "\\-
 # ie keeping only up until the 12th character
 names(RNA_data) <- substr(x = names(RNA_data), 1, 12)
 
-length(unique(colnames(RNA_data)))
+unique_RNA <- unique(colnames(RNA_data))
 
 # RNA_seq_patients <- RNA_seq_patients %>% 
 #   mutate(RNA_seq_patients = str_remove(RNA_seq_patients, "-01"))
 
 
-test_clin <- subset(clinical_data, PATIENT_ID %in% mutation_data$Tumor_Sample_Barcode)
+#test_clin <- subset(clinical_data, PATIENT_ID %in% mutation_data$Tumor_Sample_Barcode)
 
 # test_transpose <- t(RNA_data)
 #test2 <- subset(RNA_data %in% mutation_data$Tumor_Sample_Barcode)
@@ -61,10 +61,22 @@ test_clin <- subset(clinical_data, PATIENT_ID %in% mutation_data$Tumor_Sample_Ba
 
 
 # Step 1: Identify common patient IDs OF THE UNQIUE ONES 
-test_mut <- intersect(mutation_data$Tumor_Sample_Barcode, colnames(RNA_data))
+#test_mut <- intersect(mutation_data$Tumor_Sample_Barcode, colnames(RNA_data))
 
 # Step 2: Extract subset of RNA_data
-test_RNA <- RNA_data[, common_patient_ids]
+#test_RNA <- RNA_data[, common_patient_ids]
+```
+
+```{r}
+patients <- intersect(intersect(patient_id,unique_RNA), mutations_id)
+```
+
+```{r}
+clinical_data <- subset(clinical_data, PATIENT_ID %in% patients) #FILTERED!
+length(unique(clinical_data_filt$PATIENT_ID))
+
+mutation_data <- subset(mutation_data, Tumor_Sample_Barcode %in% patients) #FILTERED!
+length(unique(mutation_data_filt$Tumor_Sample_Barcode))
 ```
 
 
@@ -155,16 +167,16 @@ library(pheatmap)
 
 cnv_events = unique(mutation_data$Variant_Classification)
 
-twokeygenes <- mutation_data[which(mutation_data$Hugo_Symbol == 'BAP1' | mutation_data$Hugo_Symbol == 'PBRM1'),]
+#twokeygenes <- mutation_data[which(mutation_data$Hugo_Symbol == 'BAP1' | mutation_data$Hugo_Symbol == 'PBRM1'),]
 
 
 #dcast lets us reshape our data 
 #because we have a longggg data set of rows 
 oncomat = reshape2::dcast(
-    data = twokeygenes, #nov 28
+    #data = twokeygenes, #nov 28
     #data = mutation_data[which(mutation_data$Hugo_Symbol == 'BAP1' | mutation_data$Hugo_Symbol == 'PBRM1'),], #nov 28
 
-    #data = mutation_data,
+    data = mutation_data,
   
   #ie rows are hugo symbols, col are patients 
   formula = Hugo_Symbol ~ Tumor_Sample_Barcode, 
@@ -215,10 +227,14 @@ or, could covert ALL type of mutation to 1
 why do we need to do this? because input for clustering is numeric. must convert our char to binary
 
 ```{r}
+
+#twokeygenes <- oncomat[which(oncomat$Hugo_Symbol == 'BAP1' | oncomat$Hugo_Symbol == 'PBRM1'),]
+#rownames(oncomat) = oncomat[which(oncomat$Hugo_Symbol == 'BAP1' | oncomat$Hugo_Symbol == 'PBRM1'),]
+
 rownames(oncomat) = oncomat$Hugo_Symbol
 oncomat <- oncomat[,-1]
 
-hugo <- as.data.frame(table(twokeygenes$Hugo_Symbol))
+hugo <- as.data.frame(table(mutation_data$Hugo_Symbol))
 
 oncomat.ordered <- oncomat[order(-hugo$Freq),]
 #oncomat.ordered <- oncomat[order(-hugo$Freq),][1:20,] #only top 20 genes by freq
@@ -260,8 +276,13 @@ Patients can be grouped into clusters based on their most prevalent mutated gene
 ```{r}
 library(pheatmap)
 
-reduce.mat <- mat #clustering based on top 20 most prevalent genes
+#reduce.mat <- mat[] #clustering based on top 20 most prevalent genes
 # reduce.mat <- mat[1:20,] #clustering based on top 20 most prevalent genes
+#rownames(oncomat) = oncomat[which(oncomat$Hugo_Symbol == 'BAP1' | oncomat$Hugo_Symbol == 'PBRM1'),]
+
+genesofinterest <- c(2,5)
+reduce.mat <- mat[genesofinterest,] 
+
 res <- pheatmap(reduce.mat,
          cluster_rows = F,
          show_colnames=FALSE)
@@ -335,9 +356,9 @@ library("SummarizedExperiment")
 ```{r}
 #First load the data:
 
-tcga_data <- as.data.frame(mutation_data)
+#tcga_data <- as.data.frame(mutation_data)
 
-nottwokeygenes <- mutation_data[which(mutation_data$Hugo_Symbol != 'BAP1' & mutation_data$Hugo_Symbol != 'PBRM1'),]
+#nottwokeygenes <- mutation_data[which(mutation_data$Hugo_Symbol != 'BAP1' & mutation_data$Hugo_Symbol != 'PBRM1'),]
 
 #idk <- intersect(clinical_data$PATIENT_ID, twokeygenes$Tumor_Sample_Barcode)
 
@@ -346,7 +367,7 @@ nottwokeygenes <- mutation_data[which(mutation_data$Hugo_Symbol != 'BAP1' & muta
 ```
 
 ```{r}
-table(tcga_data@colData$vital_status)
+#table(tcga_data@colData$vital_status)
 
 ```
 
@@ -370,21 +391,26 @@ clin_df$overall_survival = ifelse(clin_df$deceased,
                                    clin_df$DSS_MONTHS,
                                   clin_df$MONTHS_LAST_FOLLOWUP)
 
-clin_df$haskeygene <- 0 #initializing
+clin_df$clusterID <- unlist(cluster)
 
-if(clin_df$PATIENT_ID == unique(twokeygenes$Tumor_Sample_Barcode)){
-  clin_df$haskeygene = 1
-}
+# if(clin_df$PATIENT_ID == unique(twokeygenes$Tumor_Sample_Barcode)){
+#   clin_df$haskeygene = 1
+# }
 
 # show first 10 samples
 head(clin_df)
 ```
+
 ```{r}
 # fit a survival model
 #ie fit that model! 
-fit = survfit(Surv(overall_survival, deceased) ~ gender, data=clin_df)
+fit = survfit(Surv(overall_survival, deceased) ~ clusterID, data=clin_df)
 
 print(fit)
+```
+```{r}
+# we produce a Kaplan-Meier plot from the fitted model
+ggsurvplot(fit, data=clin_df, pval=T, risk.table=T, risk.table.height=0.35)
 ```
 
 --------------------------------------------------------------------------------
