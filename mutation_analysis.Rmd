@@ -73,10 +73,10 @@ patients <- intersect(intersect(patient_id,unique_RNA), mutations_id)
 
 ```{r}
 clinical_data <- subset(clinical_data, PATIENT_ID %in% patients) #FILTERED!
-length(unique(clinical_data_filt$PATIENT_ID))
+length(unique(clinical_data$PATIENT_ID))
 
 mutation_data <- subset(mutation_data, Tumor_Sample_Barcode %in% patients) #FILTERED!
-length(unique(mutation_data_filt$Tumor_Sample_Barcode))
+length(unique(mutation_data$Tumor_Sample_Barcode))
 ```
 
 
@@ -280,8 +280,10 @@ library(pheatmap)
 # reduce.mat <- mat[1:20,] #clustering based on top 20 most prevalent genes
 #rownames(oncomat) = oncomat[which(oncomat$Hugo_Symbol == 'BAP1' | oncomat$Hugo_Symbol == 'PBRM1'),]
 
-genesofinterest <- c(2,5)
-reduce.mat <- mat[genesofinterest,] 
+#genesofinterest <- c(4:5)
+reduce.mat <- mat[1:5,] 
+#reduce.mat <- mat[genesofinterest,] 
+
 
 res <- pheatmap(reduce.mat,
          cluster_rows = F,
@@ -294,7 +296,7 @@ based on the 2nd layer we have 3 groups
 
 get the cluster value
 ```{r}
-cluster <-  as.data.frame(cutree(res$tree_col, k = 3)) #JUST TWO GROUPS FOR NOW
+cluster <-  as.data.frame(cutree(res$tree_col, k = 2)) #JUST TWO GROUPS FOR NOW
 #ie want to group people into 2 groups
 cluster
 table(cluster) #this is how we know how much people are in each group
@@ -380,11 +382,11 @@ clin_df = clinical_data[,
                       "DSS_MONTHS", #disease specific survival #CONFIRM WITH TA!!!!!!!!
                       "DAYS_LAST_FOLLOWUP"
                       )]
-clin_df$MONTHS_LAST_FOLLOWUP <- clin_df$DAYS_LAST_FOLLOWUP/30.417 #month to day conversion
+clin_df$MONTHS_LAST_FOLLOWUP <- clin_df$DAYS_LAST_FOLLOWUP/30.417 #days to month conversion
 
 clin_df$deceased = clin_df$OS_STATUS == "1:DECEASED"
 
-# create an "overall survival" variable that is equal to days_to_death
+# create an "overall survival" variable that is equal to days_to_death 
 # for dead patients, and to days_to_last_follow_up for patients who
 # are still alive
 clin_df$overall_survival = ifelse(clin_df$deceased,
@@ -392,6 +394,17 @@ clin_df$overall_survival = ifelse(clin_df$deceased,
                                   clin_df$MONTHS_LAST_FOLLOWUP)
 
 clin_df$clusterID <- unlist(cluster)
+
+most_mutated <- mat["BAP1", ] == 1
+
+# Extract patient IDs where VHL gene is 1
+patients_with_BAP1 <- colnames(mat)[most_mutated]
+
+# Print the result
+print(patients_with_BAP1)
+
+clin_df$BAP1_Mutation <- as.integer(clin_df$PATIENT_ID %in% patients_with_BAP1)
+
 
 # if(clin_df$PATIENT_ID == unique(twokeygenes$Tumor_Sample_Barcode)){
 #   clin_df$haskeygene = 1
@@ -404,7 +417,7 @@ head(clin_df)
 ```{r}
 # fit a survival model
 #ie fit that model! 
-fit = survfit(Surv(overall_survival, deceased) ~ clusterID, data=clin_df)
+fit = survfit(Surv(overall_survival, deceased) ~ BAP1_Mutation, data=clin_df)
 
 print(fit)
 ```
