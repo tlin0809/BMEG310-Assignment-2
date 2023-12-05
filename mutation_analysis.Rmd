@@ -280,8 +280,8 @@ library(pheatmap)
 # reduce.mat <- mat[1:20,] #clustering based on top 20 most prevalent genes
 #rownames(oncomat) = oncomat[which(oncomat$Hugo_Symbol == 'BAP1' | oncomat$Hugo_Symbol == 'PBRM1'),]
 
-#genesofinterest <- c(4:5)
-reduce.mat <- mat[1:5,] 
+#genesofinterest <- c(1:2)
+reduce.mat <- mat[1:3,] 
 #reduce.mat <- mat[genesofinterest,] 
 
 
@@ -378,24 +378,27 @@ daystodeath and daystolastfollowup will be combined for time
 # we are only interested in the "Primary solid Tumor" cases for survival
 clin_df = clinical_data[,
                     c("PATIENT_ID",
-                      "OS_STATUS",
-                      "DSS_MONTHS", #disease specific survival #CONFIRM WITH TA!!!!!!!!
+                      "PFS_STATUS",
+                      "PFS_MONTHS", #disease specific survival #CONFIRM WITH TA!!!!!!!!
                       "DAYS_LAST_FOLLOWUP"
                       )]
 clin_df$MONTHS_LAST_FOLLOWUP <- clin_df$DAYS_LAST_FOLLOWUP/30.417 #days to month conversion
 
-clin_df$deceased = clin_df$OS_STATUS == "1:DECEASED"
+#clin_df$deceased = clin_df$OS_STATUS == "1:DECEASED"
+
+#the "deceased" variable doesnt actually correlate with death. just tumor progression
+clin_df$deceased = clin_df$PFS_STATUS == "1:PROGRESSION"
 
 # create an "overall survival" variable that is equal to days_to_death 
 # for dead patients, and to days_to_last_follow_up for patients who
 # are still alive
 clin_df$overall_survival = ifelse(clin_df$deceased,
-                                   clin_df$DSS_MONTHS,
+                                   clin_df$PFS_MONTHS,
                                   clin_df$MONTHS_LAST_FOLLOWUP)
 
 clin_df$clusterID <- unlist(cluster)
 
-most_mutated <- mat["BAP1", ] == 1
+most_mutated <- mat["VHL", ] == 1
 
 # Extract patient IDs where VHL gene is 1
 patients_with_BAP1 <- colnames(mat)[most_mutated]
@@ -417,7 +420,8 @@ head(clin_df)
 ```{r}
 # fit a survival model
 #ie fit that model! 
-fit = survfit(Surv(overall_survival, deceased) ~ BAP1_Mutation, data=clin_df)
+#fit = survfit(Surv(overall_survival, deceased) ~ BAP1_Mutation, data=clin_df)
+fit = survfit(Surv(overall_survival, deceased) ~ clusterID, data=clin_df)
 
 print(fit)
 ```
