@@ -1,0 +1,302 @@
+---
+title: "commented_MUTATION+SURVIVAL"
+author: "Traye_Lin_26655720"
+date: "2023-12-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#Set up code
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
+library(dplyr)
+library(stringr)
+
+#loading data 
+clinical_data <- read.table("", fill = TRUE, stringsAsFactors = FALSE, header = TRUE, sep = '\t')
+mutation_data <- read.table("", fill = TRUE, stringsAsFactors = FALSE, header = TRUE, sep = '\t')
+RNA_data <- read.csv("", row.names = 1)
+```
+
+Trimming the data
+```{r}
+#clinical data set
+patient_id <- unique(clinical_data$PATIENT_ID)
+
+
+#mutation data set
+mutation_data <- mutation_data %>% 
+  mutate(Tumor_Sample_Barcode = str_remove(Tumor_Sample_Barcode, "-01"))
+mutations_id <- unique(mutation_data$Tumor_Sample_Barcode)
+
+
+#Change the dots to dashes for the col names in RNAseq data
+#note we are using "regular expression" syntax, where \\. is a dot and # is 
+#a dash
+names(RNA_data) <- gsub(x = names(RNA_data), pattern = "\\.", 
+                        replacement = "\\-")  
+
+# deleting the excess characters in the column names
+# ie keeping only up until the 12th character
+names(RNA_data) <- substr(x = names(RNA_data), 1, 12)
+
+unique_RNA <- unique(colnames(RNA_data))
+```
+
+filtering data to synchronize patients in each dataset
+```{r}
+patients <- intersect(intersect(patient_id,unique_RNA), mutations_id)
+
+cat("Number of unique patients in: ")
+#filtered clinical data
+clinical_data <- subset(clinical_data, PATIENT_ID %in% patients) 
+cat("clinical data:",length(unique(clinical_data$PATIENT_ID)),"\n")
+
+#filtered 
+mutation_data <- subset(mutation_data, Tumor_Sample_Barcode %in% patients) 
+cat("mutation data:",length(unique(mutation_data$Tumor_Sample_Barcode)),"\n")
+
+RNA_data <- RNA_data[,patients]
+cat("RNA data:", length(RNA_data))
+```
+
+
+
+### Plotting MAF summary
+The summary of the maf file can be visualized through a stacked barplot depicting the number of variants in each sample, alongside a boxplot summarizing variant types based on Variant_Classification, and so on.
+
+```{r}
+library(pheatmap)
+library(ggplot2)
+
+#HUGO symbol is gene names, "table" lets us summarize the content
+hugo <- as.data.frame(table(mutation_data$Hugo_Symbol))
+
+#there are only 6,732 unique genes 
+
+#Variant_classification is the outcome or consequence of the mutation 
+#Output is the frequency of each mutation type
+var.class <- as.data.frame(table(mutation_data$Variant_Classification[1:100]))
+
+#have 17 types of variant classification 
+
+#plotting the variant classifications 
+ggplot(data=var.class, aes(x=Var1, y=Freq))+
+  geom_col()+
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+```
+# Plotting the Variant Class
+```{r}
+var.class2 <- as.data.frame(table(mutation_data$VARIANT_CLASS))
+
+ggplot(data=var.class2, aes(x=Var1, y=Freq))+
+  geom_col(aes(fill=Var1))+
+  xlab("Variant Class")+
+  ylab("Frequency")
+```
+
+
+# Plotting the Variant Type 
+```{r}
+var.type <- as.data.frame(table(mutation_data$Variant_Type))
+ggplot(data=var.type, aes(x=Var1, y=Freq))+
+  geom_col( aes(fill=Var1))+
+  xlab("Variant Type")+
+  ylab("Frequency")
+```
+#A histogram of top 20 most frequently mutated genes
+#The x variables are the mutated genes 
+#The y axis is the frequency of mutation in patients
+```{r}
+#obtain the HUGO symbol for the genes
+hugo <- as.data.frame(table(mutation_data$Hugo_Symbol))
+
+#order the HUGO symbols for the genes from highest to lowest
+#so that we can analyze them from the top frequency later
+hugo.ordered <- hugo[order(-hugo$Freq),]
+
+#plot the top 20 most frequently mutated genes
+ggplot(data=hugo.ordered[1:20,], aes(x=Var1, y=Freq))+
+  geom_col()+
+  xlab("Genes")+
+  ylab("Frequency")+
+  theme(axis.text.x = element_text(angle = 45,hjust=1))+
+  #sort from highest to lowest, not alphabetically
+  scale_x_discrete(limits = hugo.ordered[1:20,]$Var1)
+ 
+```
+The graph shows top 15 mutations.
+Thus, the most mutated gene is VHL. ~100 mutations
+But a majority of the mutated genes only occurred about 3 times which is 
+not very significant.
+
+Visually, We can see the top 3 show significant more mutation. So we can start 
+with top 3 and experiment different combinations of genes, and finally, 
+compare their clustering results. 
+
+However, from our literature, we know that BAP1 mutation has a significant 
+correlation with decreased survival rates in RCC. Therefore, we can focus on 
+combinations of genes involving BAP1 when performing clustering. 
+
+
+### Generate oncoplot matrix
+
+Typically, oncoplots are based on VARIANT CLASSIFICATION so we will proceed with 
+with it first. 
+```{r}
+library(reshape2)
+library(ggplot2)
+library(pheatmap)
+
+cnv_events = unique(mutation_data$Variant_Classification)
+
+
+#Reshape our data because we have a long data set of rows 
+oncomat = reshape2::dcast(
+    #using mutation data
+    data = mutation_data,
+    #rows are hugo symbols, col are patients 
+    formula = Hugo_Symbol ~ Tumor_Sample_Barcode, 
+  
+  #Converts everything to char
+  fun.aggregate = function(x, cnv = cnv_events) {
+    x = as.character(x) # >= 2 same/distinct variant classification = Multi_Hit
+    xad = x[x %in% cnv]
+    xvc = x[!x %in% cnv]
+    
+    #if the number of mutation per that gene for that patient, say it is a multi-hit, otherwise keep it
+    if (length(xvc) > 0) {
+      xvc = ifelse(test = length(xvc) > 1,
+                   yes = 'Multi_Hit',
+                   no = xvc)
+    }
+    
+    x = ifelse(
+      test = length(xad) > 0,
+      yes = paste(xad, xvc, sep = ';'),
+      no = xvc
+    )
+    
+    #clean our real dataset
+    x = gsub(pattern = ';$',
+             replacement = '',
+             x = x)
+    x = gsub(pattern = '^;',
+             replacement = '',
+             x = x)
+    return(x)
+  },
+  value.var = 'Variant_Classification',
+  fill = '',
+  drop = FALSE
+)
+```
+Output of is a oncomat variable
+Now we need to convert this into binary since input of clustering is numeric
+
+We can either convert to binary just based on missense (missense mutation = 1), 
+or covert ALL type of mutation to 1
+
+```{r}
+#modifying row names to reflect gene names
+rownames(oncomat) = oncomat$Hugo_Symbol
+oncomat <- oncomat[,-1]
+hugo <- as.data.frame(table(mutation_data$Hugo_Symbol))
+
+#reorder the rows by frequency of highly mutated genes
+oncomat.ordered <- oncomat[order(-hugo$Freq),]
+
+```
+
+Transforming to binary and all mutations are important to us. 
+The sample size is not very large and by excluding some mutations we will 
+lose more samples which is not ideal. 
+```{r}
+mat <- oncomat.ordered
+
+mat[mat!=""]=1
+#convert non-mutated to 0
+mat[mat==""]=0
+
+mat <- apply(mat, 2 ,as.numeric)
+mat <- as.matrix(mat)
+rownames(mat)  <-  row.names(oncomat.ordered)
+```
+
+### Draw the heatmap and cluster the patients
+Cluster the patients based on the mutation types
+Patients can be grouped into clusters based on their most prevalent mutated gene or genes (here selected PBMR1 and BAP1).
+```{r}
+library(pheatmap)
+
+#setting gene of interest to be PBRM1 and BAP1
+reduce.mat <- mat[1:3, ]
+res <- pheatmap(reduce.mat,
+         cluster_rows = F,
+         show_colnames=FALSE)
+```
+The rows are the BPRM1 and BAP1.
+The columns are the patient.
+Based on the first layer we have 2 groups.
+Based on the 2nd layer we have 3 groups. 
+
+#Getting the cluster value
+```{r}
+cluster <-  as.data.frame(cutree(res$tree_col, k = 2)) 
+colnames(cluster) <- "condition"
+#getting the number of patients in each group 
+table(cluster) 
+```
+
+# Survival Analysis
+
+```{r}
+library("TCGAbiolinks")
+library("survival")
+library("survminer")
+library("SummarizedExperiment")
+
+```
+
+
+days to disease progression and days to last followup will be combined for time 
+```{r}
+clin_df = clinical_data[,
+                    c("PATIENT_ID",
+                      "PFS_STATUS",
+                      "PFS_MONTHS", 
+                      "DAYS_LAST_FOLLOWUP"
+                      )]
+#day to month conversion
+clin_df$MONTHS_LAST_FOLLOWUP <- clin_df$DAYS_LAST_FOLLOWUP/30.417 
+
+#create new column in clin_df named "deceased" that represents progression
+clin_df$deceased = clin_df$PFS_STATUS == "1:PROGRESSION"
+
+# create an "overall_survival" variable 
+clin_df$overall_survival = ifelse(clin_df$deceased,
+                                   clin_df$PFS_MONTHS,
+                                  clin_df$MONTHS_LAST_FOLLOWUP)
+
+#unlist the cluster IDs
+clin_df$clusterID <- unlist(cluster)
+
+# if(clin_df$PATIENT_ID == unique(twokeygenes$Tumor_Sample_Barcode)){
+#   clin_df$haskeygene = 1
+# }
+
+# show first 10 samples
+head(clin_df)
+```
+# fit a survial model on cluster IDs
+```{r}
+fit = survfit(Surv(overall_survival, deceased) ~ clusterID, data=clin_df)
+
+print(fit)
+```
+
+# Kaplan-Meier plot
+```{r}
+#produce a Kaplan-Meier plot from the fitted model
+ggsurvplot(fit, data=clin_df, pval=T, risk.table=T, risk.table.height=0.35)
+```
